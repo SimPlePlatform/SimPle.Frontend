@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "feature/**"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  frontend:
+    name: Lint, build, test, audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:5147
+          NEXT_PUBLIC_RECAPTCHA_SITE_KEY: placeholder
+          NEXT_PUBLIC_GOOGLE_CLIENT_ID: placeholder
+
+      - name: Tests
+        run: npm test
+
+      # npm audit may report advisories for transitive dependencies (e.g. PostCSS via Next.js)
+      # that have no safe upgrade path. Run informational-only so it does not block CI.
+      - name: npm audit (informational)
+        run: npm audit --audit-level=critical || true
