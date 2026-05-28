@@ -138,7 +138,7 @@ function AccountSettings() {
 
   // â”€â”€ Profile card (Module 2) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [profileForm, setProfileForm] = useState({ displayName: '', bio: '' });
+  const [profileForm, setProfileForm] = useState({ displayName: '', bio: '', visibility: 'Public' as UserProfile['visibility'], profileType: 'Player' as UserProfile['profileType'] });
   const [linkForm, setLinkForm] = useState<UserProfile['links']>([]);
   const [linkErrors, setLinkErrors] = useState<Record<number, string>>({});
   const [profileSaving, setProfileSaving] = useState(false);
@@ -156,12 +156,14 @@ function AccountSettings() {
   useEffect(() => {
     profileApi.getMe().then(p => {
       setProfile(p);
-      setProfileForm({ displayName: p.displayName, bio: p.bio ?? '' });
+      setProfileForm({ displayName: p.displayName, bio: p.bio ?? '', visibility: p.visibility, profileType: p.profileType });
       setLinkForm(p.links);
       setLocalAvatarColor(p.color);
       setLocalBannerColor(p.bannerFallbackColor);
     }).catch(() => {/* non-fatal during initial load */});
     profileApi.getUsernameChangeRequest().then(r => setUsernameRequest(r)).catch(() => {});
+    // Load sessions on mount so they're visible immediately.
+    accountApi.getSessions().then(setSessions).catch(() => {});
   }, []);
 
   // â”€â”€ Change password â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -207,8 +209,6 @@ function AccountSettings() {
     }
   };
 
-  // â”€â”€ Sessions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const [showSessions, setShowSessions] = useState(false);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
 
@@ -223,13 +223,6 @@ function AccountSettings() {
       setSessionsLoading(false);
     }
   }, [toast]);
-
-  // Load sessions when the panel opens, not via useEffect to avoid the
-  // set-state-in-effect lint warning. Called directly from the button handler.
-  const handleToggleSessions = () => {
-    if (!showSessions) loadSessions();
-    setShowSessions(v => !v);
-  };
 
   const handleRevokeSession = async (id: string) => {
     try {
@@ -537,55 +530,21 @@ function AccountSettings() {
                 style={{ minHeight: 80, padding: 12, width: '100%' }} />
             </Field>
             <Field label="Profile visibility" style={{ marginTop: 12 }}>
-              <select className="input" value={profile.visibility} onChange={async e => {
-                const visibility = e.target.value as UserProfile['visibility'];
-                try {
-                  const updated = await profileApi.updateMe({
-                    displayName: profile.displayName,
-                    bio: profile.bio,
-                    avatarUrl: profile.avatarUrl,
-                    bannerUrl: profile.bannerUrl,
-                    region: profile.region,
-                    statusMessage: profile.statusMessage,
-                    visibility,
-                    profileType: profile.profileType,
-                  });
-                  setProfile(updated);
-                  toast.push({ kind: 'success', title: 'Visibility updated.' });
-                } catch (err) {
-                  toast.push({ kind: 'default', title: err instanceof ApiError ? err.message : 'Could not update visibility.' });
-                }
-              }}>
+              <select className="input" value={profileForm.visibility}
+                onChange={e => setProfileForm(f => ({ ...f, visibility: e.target.value as UserProfile['visibility'] }))}>
                 <option value="Public">Public</option>
                 <option value="FriendsOnly">Friends-only</option>
                 <option value="Private">Private</option>
               </select>
-              {profile.visibility === 'FriendsOnly' && (
+              {profileForm.visibility === 'FriendsOnly' && (
                 <div style={{ fontSize: 12, color: 'var(--text-lo)', marginTop: 6 }}>
                   Friends-only visibility is saved now. Until the friends module is implemented, it behaves like private.
                 </div>
               )}
             </Field>
             <Field label="Profile type" style={{ marginTop: 12 }}>
-              <select className="input" value={profile.profileType} onChange={async e => {
-                const profileType = e.target.value as UserProfile['profileType'];
-                try {
-                  const updated = await profileApi.updateMe({
-                    displayName: profile.displayName,
-                    bio: profile.bio,
-                    avatarUrl: profile.avatarUrl,
-                    bannerUrl: profile.bannerUrl,
-                    region: profile.region,
-                    statusMessage: profile.statusMessage,
-                    visibility: profile.visibility,
-                    profileType,
-                  });
-                  setProfile(updated);
-                  toast.push({ kind: 'success', title: 'Profile type updated.' });
-                } catch (err) {
-                  toast.push({ kind: 'default', title: err instanceof ApiError ? err.message : 'Could not update profile type.' });
-                }
-              }}>
+              <select className="input" value={profileForm.profileType}
+                onChange={e => setProfileForm(f => ({ ...f, profileType: e.target.value as UserProfile['profileType'] }))}>
                 <option value="Player">Player</option>
                 <option value="Developer">Developer</option>
               </select>
@@ -686,7 +645,7 @@ function AccountSettings() {
             </div>
             <div className="row" style={{ marginTop: 14, justifyContent: 'flex-end', gap: 8 }}>
               <Button variant="ghost" onClick={() => {
-                setProfileForm({ displayName: profile.displayName, bio: profile.bio ?? '' });
+                setProfileForm({ displayName: profile.displayName, bio: profile.bio ?? '', visibility: profile.visibility, profileType: profile.profileType });
                 setLinkForm(profile.links);
                 setLinkErrors({});
               }}>
@@ -702,10 +661,11 @@ function AccountSettings() {
                     bannerUrl: profile.bannerUrl,
                     region: profile.region,
                     statusMessage: profile.statusMessage,
-                    visibility: profile.visibility,
-                    profileType: profile.profileType,
+                    visibility: profileForm.visibility,
+                    profileType: profileForm.profileType,
                   });
                   setProfile(updated);
+                  setProfileForm(f => ({ ...f, visibility: updated.visibility, profileType: updated.profileType }));
                   toast.push({ kind: 'success', title: 'Profile saved.', body: 'Your changes are live.' });
                 } catch (e) {
                   toast.push({ kind: 'default', title: e instanceof ApiError ? e.message : 'Could not save profile.' });
@@ -713,7 +673,7 @@ function AccountSettings() {
                   setProfileSaving(false);
                 }
               }}>
-                {profileSaving ? 'â€¦' : 'Save changes'}
+                {profileSaving ? '…' : 'Save changes'}
               </Button>
             </div>
           </>
@@ -772,48 +732,17 @@ function AccountSettings() {
           }
         />
 
-        <SettingRow
-          label="Active sessions"
-          hint={sessions.length > 0 ? `${sessions.length} active session${sessions.length > 1 ? 's' : ''}` : 'Sign-in devices'}
-          right={
-            showSessions ? (
-              <Button size="sm" variant="ghost" onClick={handleToggleSessions}>Hide</Button>
-            ) : (
-              <Button size="sm" variant="ghost" onClick={handleToggleSessions}>View</Button>
-            )
-          }
-        />
+      </SettingCard>
 
-        {showSessions && (
-          <div style={{ marginTop: 8 }}>
-            {sessionsLoading && <div style={{ fontSize: 12, color: 'var(--text-lo)' }}>Loadingâ€¦</div>}
-            {!sessionsLoading && sessions.length === 0 && (
-              <div style={{ fontSize: 12, color: 'var(--text-lo)' }}>No active sessions found.</div>
-            )}
-            {sessions.map(s => (
-              <div key={s.id} className="row between" style={{ padding: '8px 0', borderTop: '1px solid var(--border-1)', fontSize: 12 }}>
-                <div>
-                  <div style={{ fontWeight: 500 }}>
-                    {s.ipAddress}{s.isCurrent && <span className="chip chip--red chip--mono" style={{ marginLeft: 6, fontSize: 10 }}>current</span>}
-                  </div>
-                  <div style={{ color: 'var(--text-lo)', marginTop: 2 }}>{s.userAgent ?? 'Unknown device'}</div>
-                </div>
-                {!s.isCurrent && (
-                  <Button size="sm" variant="ghost" onClick={() => handleRevokeSession(s.id)}
-                    style={{ color: 'var(--danger)', fontSize: 11 }}>Revoke</Button>
-                )}
-              </div>
-            ))}
-            {sessions.filter(s => !s.isCurrent).length > 0 && (
-              <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border-1)' }}>
-                <Button size="sm" variant="ghost" onClick={handleRevokeAllSessions} disabled={revokeAllLoading}
-                  style={{ color: 'var(--danger)', fontSize: 12 }}>
-                  {revokeAllLoading ? 'â€¦' : 'Sign out all other devices'}
-                </Button>
-              </div>
-            )}
-          </div>
-        )}
+      <SettingCard title="Devices & sessions" sub="All devices currently signed in to your account.">
+        <SessionsList
+          sessions={sessions}
+          loading={sessionsLoading}
+          revokeAllLoading={revokeAllLoading}
+          onRevoke={handleRevokeSession}
+          onRevokeAll={handleRevokeAllSessions}
+          onRefresh={loadSessions}
+        />
       </SettingCard>
 
       <SettingCard title="Danger zone">
@@ -980,6 +909,62 @@ function PrivacySettings() {
       } />
       <SettingRow label="Block list" hint="0 blocked players" right={<Button size="sm" variant="ghost">Manage</Button>} />
     </SettingCard>
+  );
+}
+
+function SessionsList({
+  sessions, loading, revokeAllLoading, onRevoke, onRevokeAll, onRefresh,
+}: {
+  sessions: Session[];
+  loading: boolean;
+  revokeAllLoading: boolean;
+  onRevoke: (id: string) => void;
+  onRevokeAll: () => void;
+  onRefresh: () => void;
+}) {
+  const otherSessions = sessions.filter(s => !s.isCurrent);
+
+  return (
+    <div>
+      <div className="row between" style={{ marginBottom: 10 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-lo)' }}>
+          {loading ? 'Loading…' : sessions.length === 0 ? 'No active sessions found.' : `${sessions.length} active session${sessions.length !== 1 ? 's' : ''}`}
+        </div>
+        <Button size="sm" variant="ghost" onClick={onRefresh} disabled={loading}>Refresh</Button>
+      </div>
+
+      {sessions.map(s => (
+        <div key={s.id} className="row between" style={{ padding: '10px 0', borderTop: '1px solid var(--border-1)', gap: 12 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 13, fontWeight: 500 }}>{s.ipAddress || 'Unknown IP'}</span>
+              {s.isCurrent && (
+                <span className="chip chip--red chip--mono" style={{ fontSize: 10 }}>This device</span>
+              )}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-lo)', marginTop: 2 }}>{s.userAgent ?? 'Unknown device'}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>
+              Signed in {new Date(s.createdAt).toLocaleDateString()} · expires {new Date(s.expiresAt).toLocaleDateString()}
+            </div>
+          </div>
+          {!s.isCurrent && (
+            <Button size="sm" variant="ghost" onClick={() => onRevoke(s.id)}
+              style={{ color: 'var(--danger)', flexShrink: 0 }}>
+              Sign out
+            </Button>
+          )}
+        </div>
+      ))}
+
+      {otherSessions.length > 0 && (
+        <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border-1)' }}>
+          <Button variant="ghost" onClick={onRevokeAll} disabled={revokeAllLoading}
+            style={{ color: 'var(--danger)', fontSize: 13 }}>
+            {revokeAllLoading ? '…' : `Sign out all other devices (${otherSessions.length})`}
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }
 

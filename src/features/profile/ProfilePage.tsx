@@ -183,7 +183,7 @@ export function ProfilePage({ userId }: { userId: string }) {
 
   const avatarUser = { initials: profile.initials, color: localAvatarColor ?? profile.color, status: 'online' as const };
   const joinedYear = new Date(profile.joinedAt).getFullYear();
-  const regionText = profile.region?.trim();
+  const regionText = profile.region?.trim().toLowerCase() === 'eu-west' ? '' : profile.region?.trim();
 
   return (
     <div className="page">
