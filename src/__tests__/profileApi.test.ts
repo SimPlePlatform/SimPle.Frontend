@@ -25,6 +25,8 @@ const SAMPLE_PROFILE = {
   bio: null,
   avatarUrl: null,
   bannerUrl: null,
+  hasUploadedAvatar: false,
+  hasUploadedBanner: false,
   statusMessage: null,
   region: 'EU-West',
   color: '#F0394B',
@@ -105,5 +107,84 @@ describe('profileApi', () => {
     const { profileApi } = await import('@/features/profile/profileApi');
     const { ApiError } = await import('@/lib/api-client');
     await expect(profileApi.getPublic('privateuser')).rejects.toBeInstanceOf(ApiError);
+  });
+
+  it('uploadAvatar uses presigned URL then confirms', async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          uploadUrl: 'https://s3-upload.test/avatar',
+          objectKey: 'profile-assets/users/u-1/avatar/file.png',
+          contentType: 'image/png',
+          expiresAtUtc: '2026-01-01T00:10:00Z',
+        }),
+      })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: () => Promise.resolve({}) })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ ...SAMPLE_PROFILE, hasUploadedAvatar: true }),
+      });
+
+    const { profileApi } = await import('@/features/profile/profileApi');
+    const file = new File(['avatar'], 'avatar.png', { type: 'image/png' });
+    const result = await profileApi.uploadAvatar(file);
+
+    expect(mockFetch).toHaveBeenNthCalledWith(1, expect.stringContaining('/api/profile/me/avatar/upload-url'), expect.objectContaining({ method: 'POST' }));
+    expect(mockFetch).toHaveBeenNthCalledWith(2, 'https://s3-upload.test/avatar', expect.objectContaining({ method: 'PUT' }));
+    expect(mockFetch).toHaveBeenNthCalledWith(3, expect.stringContaining('/api/profile/me/avatar/confirm'), expect.objectContaining({ method: 'POST' }));
+    expect(result.hasUploadedAvatar).toBe(true);
+  });
+
+  it('removeAvatar calls DELETE /api/profile/me/avatar', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200, json: () => Promise.resolve(SAMPLE_PROFILE) });
+    const { profileApi } = await import('@/features/profile/profileApi');
+    await profileApi.removeAvatar();
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/profile/me/avatar'),
+      expect.objectContaining({ method: 'DELETE' }),
+    );
+  });
+
+  it('uploadBanner uses presigned URL then confirms', async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          uploadUrl: 'https://s3-upload.test/banner',
+          objectKey: 'profile-assets/users/u-1/banner/file.webp',
+          contentType: 'image/webp',
+          expiresAtUtc: '2026-01-01T00:10:00Z',
+        }),
+      })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: () => Promise.resolve({}) })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ ...SAMPLE_PROFILE, hasUploadedBanner: true }),
+      });
+
+    const { profileApi } = await import('@/features/profile/profileApi');
+    const file = new File(['banner'], 'banner.webp', { type: 'image/webp' });
+    const result = await profileApi.uploadBanner(file);
+
+    expect(mockFetch).toHaveBeenNthCalledWith(1, expect.stringContaining('/api/profile/me/banner/upload-url'), expect.objectContaining({ method: 'POST' }));
+    expect(mockFetch).toHaveBeenNthCalledWith(2, 'https://s3-upload.test/banner', expect.objectContaining({ method: 'PUT' }));
+    expect(mockFetch).toHaveBeenNthCalledWith(3, expect.stringContaining('/api/profile/me/banner/confirm'), expect.objectContaining({ method: 'POST' }));
+    expect(result.hasUploadedBanner).toBe(true);
+  });
+
+  it('updateAvatarFallback calls fallback endpoint', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200, json: () => Promise.resolve({ ...SAMPLE_PROFILE, color: '#3366AA' }) });
+    const { profileApi } = await import('@/features/profile/profileApi');
+    const result = await profileApi.updateAvatarFallback('#3366AA');
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/profile/me/avatar/fallback'),
+      expect.objectContaining({ method: 'PUT', body: expect.stringContaining('#3366AA') }),
+    );
+    expect(result.color).toBe('#3366AA');
   });
 });
