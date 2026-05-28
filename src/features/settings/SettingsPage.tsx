@@ -11,21 +11,41 @@ import { useAuth } from '@/features/auth/AuthProvider';
 import { profileApi, type UserProfile, type UsernameChangeRequest } from '@/features/profile/profileApi';
 
 const LINK_PLATFORMS = [
-  { value: 'github', label: 'GitHub' },
-  { value: 'xtwitter', label: 'X/Twitter' },
+  { value: 'github',    label: 'GitHub' },
+  { value: 'xtwitter',  label: 'X/Twitter' },
   { value: 'instagram', label: 'Instagram' },
-  { value: 'website', label: 'Website' },
-  { value: 'discord', label: 'Discord' },
+  { value: 'discord',   label: 'Discord' },
 ] as const;
 
-function validateExternalLinkUrl(url: string): string | null {
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== 'https:') return 'Use a valid HTTPS URL.';
-    return null;
-  } catch {
-    return 'Use a valid absolute URL.';
+const PLATFORM_HINTS: Record<string, string> = {
+  github:    'github.com/handle or just the handle',
+  xtwitter:  'x.com/handle or @handle',
+  instagram: 'instagram.com/handle or @handle',
+  discord:   'discord.gg/server, discord.com/... or @username',
+};
+
+const PLATFORM_ALLOWED_HOSTS: Record<string, string[]> = {
+  github:    ['github.com', 'www.github.com'],
+  xtwitter:  ['x.com', 'twitter.com', 'www.x.com', 'www.twitter.com'],
+  instagram: ['instagram.com', 'www.instagram.com'],
+  discord:   ['discord.gg', 'discord.com', 'www.discord.com'],
+};
+
+function validateLinkForPlatform(platform: string, value: string): string | null {
+  if (!value.trim()) return 'Enter a handle or URL.';
+  if (/^(javascript|data|file):/i.test(value)) return 'Unsafe scheme.';
+  if (value.includes('://')) {
+    try {
+      const parsed = new URL(value);
+      if (parsed.protocol !== 'https:') return 'Use a valid HTTPS URL.';
+      const allowed = PLATFORM_ALLOWED_HOSTS[platform] ?? [];
+      if (allowed.length > 0 && !allowed.includes(parsed.hostname.toLowerCase()))
+        return `URL must be on ${allowed[0]}.`;
+    } catch {
+      return 'Use a valid URL or just the handle.';
+    }
   }
+  return null;
 }
 
 const SECTIONS = [
@@ -129,12 +149,17 @@ function AccountSettings() {
   const [usernameRequestLoading, setUsernameRequestLoading] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [bannerUploading, setBannerUploading] = useState(false);
+  // Local color state — preview only. Saved explicitly on blur or button press.
+  const [localAvatarColor, setLocalAvatarColor] = useState<string | null>(null);
+  const [localBannerColor, setLocalBannerColor] = useState<string | null>(null);
 
   useEffect(() => {
     profileApi.getMe().then(p => {
       setProfile(p);
       setProfileForm({ displayName: p.displayName, bio: p.bio ?? '' });
       setLinkForm(p.links);
+      setLocalAvatarColor(p.color);
+      setLocalBannerColor(p.bannerFallbackColor);
     }).catch(() => {/* non-fatal during initial load */});
     profileApi.getUsernameChangeRequest().then(r => setUsernameRequest(r)).catch(() => {});
   }, []);
@@ -308,7 +333,7 @@ function AccountSettings() {
           <>
             <div className="row" style={{ gap: 18 }}>
               <div style={{ position: 'relative', cursor: 'pointer' }} title="Click to upload a new avatar">
-                <Avatar user={{ initials: profile.initials, color: profile.color, status: 'online' }} src={profile.avatarUrl} size="xl" />
+                <Avatar user={{ initials: profile.initials, color: localAvatarColor ?? profile.color, status: 'online' }} src={profile.avatarUrl} size="xl" />
                 <label style={{
                   position: 'absolute', inset: 0, borderRadius: '50%',
                   background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center',
@@ -353,27 +378,39 @@ function AccountSettings() {
                     Remove avatar
                   </Button>
                 ) : (
-                  <label className="row" style={{ gap: 8, fontSize: 12, color: 'var(--text-md)' }}>
-                    <input type="color" value={profile.color} onChange={async e => {
-                      setAvatarUploading(true);
-                      try {
-                        const updated = await profileApi.updateAvatarFallback(e.target.value);
-                        setProfile(updated);
-                        toast.push({ kind: 'success', title: 'Avatar color updated.' });
-                      } catch (err) {
-                        toast.push({ kind: 'default', title: err instanceof ApiError ? err.message : 'Could not update avatar color.' });
-                      } finally {
-                        setAvatarUploading(false);
-                      }
-                    }} />
-                    Default avatar color
-                  </label>
+                  <div className="col" style={{ gap: 6 }}>
+                    <label className="row" style={{ gap: 8, fontSize: 12, color: 'var(--text-md)' }}>
+                      <input
+                        type="color"
+                        value={localAvatarColor ?? profile.color}
+                        onChange={e => setLocalAvatarColor(e.target.value)}
+                        onBlur={async e => {
+                          const color = e.target.value;
+                          if (color === profile.color) return;
+                          setAvatarUploading(true);
+                          try {
+                            const updated = await profileApi.updateAvatarFallback(color);
+                            setProfile(updated);
+                            setLocalAvatarColor(updated.color);
+                            toast.push({ kind: 'success', title: 'Avatar color saved.' });
+                          } catch (err) {
+                            setLocalAvatarColor(profile.color);
+                            toast.push({ kind: 'default', title: err instanceof ApiError ? err.message : 'Could not update avatar color.' });
+                          } finally {
+                            setAvatarUploading(false);
+                          }
+                        }}
+                      />
+                      Default avatar color
+                    </label>
+                    <div style={{ fontSize: 11, color: 'var(--text-lo)' }}>Close the picker to save.</div>
+                  </div>
                 )}
               </div>
               <div className="col" style={{ flex: 1, gap: 10 }}>
                 <div style={{
                   minHeight: 72, borderRadius: 8, border: '1px solid var(--border-1)',
-                  background: profile.bannerUrl ? `url(${profile.bannerUrl}) center/cover` : `linear-gradient(135deg, ${profile.bannerFallbackColor} 0%, #1B2238 55%, #0B0F18 100%)`,
+                  background: profile.bannerUrl ? `url(${profile.bannerUrl}) center/cover` : `linear-gradient(135deg, ${localBannerColor ?? profile.bannerFallbackColor} 0%, #1B2238 55%, #0B0F18 100%)`,
                   position: 'relative', overflow: 'hidden'
                 }}>
                   <label style={{ position: 'absolute', top: 8, right: 8 }}>
@@ -417,18 +454,27 @@ function AccountSettings() {
                   )}
                   {!profile.hasUploadedBanner && (
                     <label className="row" style={{ position: 'absolute', right: 8, bottom: 8, gap: 8, fontSize: 12, color: 'var(--text-md)' }}>
-                      <input type="color" value={profile.bannerFallbackColor} onChange={async e => {
-                        setBannerUploading(true);
-                        try {
-                          const updated = await profileApi.updateBannerFallback(e.target.value);
-                          setProfile(updated);
-                          toast.push({ kind: 'success', title: 'Cover color updated.' });
-                        } catch (err) {
-                          toast.push({ kind: 'default', title: err instanceof ApiError ? err.message : 'Could not update cover color.' });
-                        } finally {
-                          setBannerUploading(false);
-                        }
-                      }} />
+                      <input
+                        type="color"
+                        value={localBannerColor ?? profile.bannerFallbackColor}
+                        onChange={e => setLocalBannerColor(e.target.value)}
+                        onBlur={async e => {
+                          const color = e.target.value;
+                          if (color === profile.bannerFallbackColor) return;
+                          setBannerUploading(true);
+                          try {
+                            const updated = await profileApi.updateBannerFallback(color);
+                            setProfile(updated);
+                            setLocalBannerColor(updated.bannerFallbackColor);
+                            toast.push({ kind: 'success', title: 'Cover color saved.' });
+                          } catch (err) {
+                            setLocalBannerColor(profile.bannerFallbackColor);
+                            toast.push({ kind: 'default', title: err instanceof ApiError ? err.message : 'Could not update cover color.' });
+                          } finally {
+                            setBannerUploading(false);
+                          }
+                        }}
+                      />
                       Default cover color
                     </label>
                   )}
@@ -565,19 +611,27 @@ function AccountSettings() {
                   <div key={link.id} className="col" style={{ gap: 4 }}>
                     <div className="row" style={{ gap: 8, alignItems: 'center' }}>
                     <select className="input" aria-label="Link platform" value={link.platform}
-                      onChange={e => setLinkForm(links => links.map((l, i) => i === index ? { ...l, platform: e.target.value } : l))}
+                      onChange={e => {
+                        const newPlatform = e.target.value;
+                        setLinkForm(links => links.map((l, i) => i === index ? { ...l, platform: newPlatform, url: '' } : l));
+                        setLinkErrors(errors => ({ ...errors, [index]: '' }));
+                      }}
                       style={{ width: 130 }}>
                       {LINK_PLATFORMS.map(platform => (
                         <option key={platform.value} value={platform.value}>{platform.label}</option>
                       ))}
                     </select>
-                    <input className="input" aria-label="Link URL" placeholder="https://example.com"
+                    <input
+                      className="input"
+                      aria-label="Link URL or handle"
+                      placeholder={PLATFORM_HINTS[link.platform] ?? 'Handle or URL'}
                       value={link.url}
                       onChange={e => {
-                        setLinkErrors(errors => ({ ...errors, [index]: validateExternalLinkUrl(e.target.value) ?? '' }));
+                        setLinkErrors(errors => ({ ...errors, [index]: validateLinkForPlatform(link.platform, e.target.value) ?? '' }));
                         setLinkForm(links => links.map((l, i) => i === index ? { ...l, url: e.target.value } : l));
                       }}
-                      style={{ flex: 1 }} />
+                      style={{ flex: 1 }}
+                    />
                     <input className="input" aria-label="Link label" placeholder="Label"
                       value={link.displayLabel ?? ''}
                       onChange={e => setLinkForm(links => links.map((l, i) => i === index ? { ...l, displayLabel: e.target.value || null } : l))}
@@ -599,12 +653,12 @@ function AccountSettings() {
                 <Button size="sm" disabled={linksSaving} onClick={async () => {
                   const errors = Object.fromEntries(
                     linkForm
-                      .map((link, index) => [index, validateExternalLinkUrl(link.url)] as const)
+                      .map((link, index) => [index, validateLinkForPlatform(link.platform, link.url)] as const)
                       .filter(([, error]) => error)
                   ) as Record<number, string>;
                   setLinkErrors(errors);
                   if (Object.keys(errors).length > 0) {
-                    toast.push({ kind: 'default', title: 'Links must be valid HTTPS URLs.' });
+                    toast.push({ kind: 'default', title: 'Fix link errors before saving.' });
                     return;
                   }
                   setLinksSaving(true);

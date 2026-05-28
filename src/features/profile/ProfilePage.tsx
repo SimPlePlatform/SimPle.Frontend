@@ -15,6 +15,27 @@ import { profileApi, type UserProfile } from '@/features/profile/profileApi';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { ApiError } from '@/lib/api-client';
 
+const VISIBILITY_STYLES: Record<string, { label: string; color: string; bg: string }> = {
+  Public:      { label: 'Public',       color: '#34D399', bg: 'rgba(52,211,153,0.12)' },
+  Private:     { label: 'Private',      color: '#94A3B8', bg: 'rgba(148,163,184,0.12)' },
+  FriendsOnly: { label: 'Friends-only', color: '#38BDF8', bg: 'rgba(56,189,248,0.12)' },
+};
+
+function VisibilityBadge({ visibility }: { visibility: string }) {
+  const s = VISIBILITY_STYLES[visibility] ?? { label: visibility, color: 'var(--text-lo)', bg: 'transparent' };
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      padding: '2px 8px', borderRadius: 999, fontSize: 11, fontWeight: 600,
+      fontFamily: 'var(--font-mono)', letterSpacing: '0.04em',
+      color: s.color, background: s.bg, border: `1px solid ${s.color}33`,
+    }}>
+      <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
+      {s.label}
+    </span>
+  );
+}
+
 export function ProfilePage({ userId }: { userId: string }) {
   const { user: authUser } = useAuth();
   const toast = useToast();
@@ -27,6 +48,8 @@ export function ProfilePage({ userId }: { userId: string }) {
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const [bannerMenuOpen, setBannerMenuOpen] = useState(false);
   const [editForm, setEditForm] = useState({ displayName: '', bio: '' });
+  const [localAvatarColor, setLocalAvatarColor] = useState<string | null>(null);
+  const [localBannerColor, setLocalBannerColor] = useState<string | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
 
@@ -39,6 +62,8 @@ export function ProfilePage({ userId }: { userId: string }) {
         if (cancelled) return;
         setProfile(data);
         setEditForm({ displayName: data.displayName, bio: data.bio ?? '' });
+        setLocalAvatarColor(data.color);
+        setLocalBannerColor(data.bannerFallbackColor);
         setLoading(false);
       })
       .catch(() => { if (!cancelled) setLoading(false); });
@@ -109,8 +134,10 @@ export function ProfilePage({ userId }: { userId: string }) {
     try {
       const updated = await profileApi.updateAvatarFallback(color);
       setProfile(updated);
-      toast.push({ kind: 'success', title: 'Avatar color updated.' });
+      setLocalAvatarColor(updated.color);
+      toast.push({ kind: 'success', title: 'Avatar color saved.' });
     } catch (e) {
+      if (profile) setLocalAvatarColor(profile.color);
       toast.push({ kind: 'default', title: e instanceof ApiError ? e.message : 'Could not update avatar color.' });
     } finally {
       setMediaLoading(null);
@@ -123,8 +150,10 @@ export function ProfilePage({ userId }: { userId: string }) {
     try {
       const updated = await profileApi.updateBannerFallback(color);
       setProfile(updated);
-      toast.push({ kind: 'success', title: 'Cover color updated.' });
+      setLocalBannerColor(updated.bannerFallbackColor);
+      toast.push({ kind: 'success', title: 'Cover color saved.' });
     } catch (e) {
+      if (profile) setLocalBannerColor(profile.bannerFallbackColor);
       toast.push({ kind: 'default', title: e instanceof ApiError ? e.message : 'Could not update cover color.' });
     } finally {
       setMediaLoading(null);
@@ -152,14 +181,14 @@ export function ProfilePage({ userId }: { userId: string }) {
     );
   }
 
-  const avatarUser = { initials: profile.initials, color: profile.color, status: 'online' as const };
+  const avatarUser = { initials: profile.initials, color: localAvatarColor ?? profile.color, status: 'online' as const };
   const joinedYear = new Date(profile.joinedAt).getFullYear();
   const regionText = profile.region?.trim();
 
   return (
     <div className="page">
       <div className="card-elev" style={{ overflow: 'hidden', padding: 0 }}>
-        <div style={{ height: 160, position: 'relative', background: profile.bannerUrl ? `url(${profile.bannerUrl}) center/cover` : `linear-gradient(135deg, ${profile.bannerFallbackColor} 0%, #1B2238 55%, #0B0F18 100%)` }}>
+        <div style={{ height: 160, position: 'relative', background: profile.bannerUrl ? `url(${profile.bannerUrl}) center/cover` : `linear-gradient(135deg, ${localBannerColor ?? profile.bannerFallbackColor} 0%, #1B2238 55%, #0B0F18 100%)` }}>
           <div className="grid-bg" style={{ opacity: 0.5 }} />
           {isOwn && (
             <div style={{ position: 'absolute', top: 14, right: editing ? 170 : 14 }}>
@@ -188,8 +217,13 @@ export function ProfilePage({ userId }: { userId: string }) {
                     <label className="row" style={{ width: '100%', gap: 8, padding: 8, fontSize: 13, cursor: 'pointer' }}>
                       <input
                         type="color"
-                        value={profile.bannerFallbackColor}
-                        onChange={e => void updateBannerFallbackColor(e.target.value)}
+                        value={localBannerColor ?? profile.bannerFallbackColor}
+                        onChange={e => setLocalBannerColor(e.target.value)}
+                        onBlur={async e => {
+                          const color = e.target.value;
+                          if (color === profile.bannerFallbackColor) return;
+                          await updateBannerFallbackColor(color);
+                        }}
                         style={{ width: 24, height: 24, padding: 0, border: 0, background: 'transparent' }}
                       />
                       Edit default cover color
@@ -255,8 +289,13 @@ export function ProfilePage({ userId }: { userId: string }) {
                       <label className="row" style={{ width: '100%', gap: 8, padding: 8, fontSize: 13, cursor: 'pointer' }}>
                         <input
                           type="color"
-                          value={profile.color}
-                          onChange={e => void updateAvatarFallbackColor(e.target.value)}
+                          value={localAvatarColor ?? profile.color}
+                          onChange={e => setLocalAvatarColor(e.target.value)}
+                          onBlur={async e => {
+                            const color = e.target.value;
+                            if (color === profile.color) return;
+                            await updateAvatarFallbackColor(color);
+                          }}
                           style={{ width: 24, height: 24, padding: 0, border: 0, background: 'transparent' }}
                         />
                         Edit default avatar color
@@ -293,6 +332,7 @@ export function ProfilePage({ userId }: { userId: string }) {
               <span className="chip chip--mono">{profile.elo} ELO</span>
               <span className="chip chip--mono">Lv {profile.level}</span>
               <span className="chip chip--mono">{profile.profileType}</span>
+              <VisibilityBadge visibility={profile.visibility} />
             </div>
           </div>
           {!editing ? (
