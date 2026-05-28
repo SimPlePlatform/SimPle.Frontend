@@ -1,11 +1,14 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
 import { Icon } from '@/components/ui/Icons';
 import { Toggle } from '@/components/ui/Toggle';
 import { useToast } from '@/components/ui/Toast';
 import { CURRENT_USER } from '@/mock/users';
+import { accountApi, type Session } from '@/features/auth/accountApi';
+import { ApiError } from '@/lib/api-client';
+import { useAuth } from '@/features/auth/AuthProvider';
 
 const SECTIONS = [
   { id: 'account', label: 'Account',       icon: 'user' },
@@ -93,9 +96,107 @@ function Field({ label, children, style }: { label: string; children: React.Reac
 
 function AccountSettings() {
   const toast = useToast();
-  const u = CURRENT_USER;
+  const { user, logout } = useAuth();
+  const u = CURRENT_USER; // still used for avatar/profile card (Module 2 will wire this)
+
+  // ── Change password ───────────────────────────────────────────────────────
+  const [showChangePw, setShowChangePw] = useState(false);
+  const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
+  const [pwLoading, setPwLoading] = useState(false);
+
+  const handleChangePassword = async () => {
+    if (pwForm.next !== pwForm.confirm) {
+      toast.push({ kind: 'default', title: 'Passwords do not match' });
+      return;
+    }
+    setPwLoading(true);
+    try {
+      await accountApi.changePassword(pwForm.current, pwForm.next, pwForm.confirm);
+      toast.push({ kind: 'success', title: 'Password updated', body: 'You have been signed out of all sessions.' });
+      setShowChangePw(false);
+      setPwForm({ current: '', next: '', confirm: '' });
+      await logout();
+    } catch (e) {
+      toast.push({ kind: 'default', title: e instanceof ApiError ? e.message : 'Could not update password.' });
+    } finally {
+      setPwLoading(false);
+    }
+  };
+
+  // ── Change email ──────────────────────────────────────────────────────────
+  const [showChangeEmail, setShowChangeEmail] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [emailLoading, setEmailLoading] = useState(false);
+
+  const handleChangeEmail = async () => {
+    setEmailLoading(true);
+    try {
+      await accountApi.changeEmail(newEmail);
+      toast.push({ kind: 'success', title: 'Verification sent', body: 'Check your new email for the confirmation link.' });
+      setShowChangeEmail(false);
+      setNewEmail('');
+    } catch (e) {
+      toast.push({ kind: 'default', title: e instanceof ApiError ? e.message : 'Could not request email change.' });
+    } finally {
+      setEmailLoading(false);
+    }
+  };
+
+  // ── Sessions ──────────────────────────────────────────────────────────────
+  const [showSessions, setShowSessions] = useState(false);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+
+  const loadSessions = useCallback(async () => {
+    setSessionsLoading(true);
+    try {
+      const data = await accountApi.getSessions();
+      setSessions(data);
+    } catch {
+      toast.push({ kind: 'default', title: 'Could not load sessions.' });
+    } finally {
+      setSessionsLoading(false);
+    }
+  }, [toast]);
+
+  // Load sessions when the panel opens, not via useEffect to avoid the
+  // set-state-in-effect lint warning. Called directly from the button handler.
+  const handleToggleSessions = () => {
+    if (!showSessions) loadSessions();
+    setShowSessions(v => !v);
+  };
+
+  const handleRevokeSession = async (id: string) => {
+    try {
+      await accountApi.revokeSession(id);
+      setSessions(s => s.filter(x => x.id !== id));
+      toast.push({ kind: 'success', title: 'Session revoked.' });
+    } catch (e) {
+      toast.push({ kind: 'default', title: e instanceof ApiError ? e.message : 'Could not revoke session.' });
+    }
+  };
+
+  // ── Delete account ────────────────────────────────────────────────────────
+  const [showDelete, setShowDelete] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const handleDeleteAccount = async () => {
+    setDeleteLoading(true);
+    try {
+      await accountApi.deleteAccount(deletePassword);
+      toast.push({ kind: 'success', title: 'Account deleted.' });
+      await logout();
+    } catch (e) {
+      toast.push({ kind: 'default', title: e instanceof ApiError ? e.message : 'Could not delete account.' });
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   return (
     <>
+      {/* Profile card — wired to real API in Module 2 */}
       <SettingCard title="Profile" sub="Public info shown to other players.">
         <div className="row" style={{ gap: 18 }}>
           <Avatar user={u} size="xl" />
@@ -114,14 +215,119 @@ function AccountSettings() {
       </SettingCard>
 
       <SettingCard title="Login & security">
-        <SettingRow label="Email" hint="alex@simple.gg · verified" right={<Button size="sm" variant="ghost">Change</Button>} />
-        <SettingRow label="Password" hint="Last changed 28 days ago" right={<Button size="sm" variant="ghost">Update</Button>} />
-        <SettingRow label="Two-factor authentication" hint="Adds a code on every new device" right={<Toggle on={true} onChange={() => {}} label="" />} />
-        <SettingRow label="Active sessions" hint="2 devices · Frankfurt, Amsterdam" right={<Button size="sm" variant="ghost">View</Button>} />
+        <SettingRow
+          label="Email"
+          hint={user ? `${user.email} · ${user.isEmailVerified ? 'verified' : 'unverified'}` : '—'}
+          right={
+            showChangeEmail ? (
+              <div className="row" style={{ gap: 6 }}>
+                <input
+                  className="input"
+                  placeholder="New email"
+                  value={newEmail}
+                  onChange={e => setNewEmail(e.target.value)}
+                  style={{ width: 180 }}
+                />
+                <Button size="sm" onClick={handleChangeEmail} disabled={emailLoading || !newEmail}>
+                  {emailLoading ? '…' : 'Send link'}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setShowChangeEmail(false)}>Cancel</Button>
+              </div>
+            ) : (
+              <Button size="sm" variant="ghost" onClick={() => setShowChangeEmail(true)}>Change</Button>
+            )
+          }
+        />
+
+        <SettingRow
+          label="Password"
+          hint="Change your sign-in password"
+          right={
+            showChangePw ? (
+              <div className="col" style={{ gap: 6, alignItems: 'flex-end' }}>
+                <input className="input" type="password" placeholder="Current password"
+                  value={pwForm.current} onChange={e => setPwForm(f => ({ ...f, current: e.target.value }))} style={{ width: 220 }} />
+                <input className="input" type="password" placeholder="New password"
+                  value={pwForm.next} onChange={e => setPwForm(f => ({ ...f, next: e.target.value }))} style={{ width: 220 }} />
+                <input className="input" type="password" placeholder="Confirm new password"
+                  value={pwForm.confirm} onChange={e => setPwForm(f => ({ ...f, confirm: e.target.value }))} style={{ width: 220 }} />
+                <div className="row" style={{ gap: 6 }}>
+                  <Button size="sm" onClick={handleChangePassword} disabled={pwLoading || !pwForm.current || !pwForm.next}>
+                    {pwLoading ? '…' : 'Update'}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setShowChangePw(false)}>Cancel</Button>
+                </div>
+              </div>
+            ) : (
+              <Button size="sm" variant="ghost" onClick={() => setShowChangePw(true)}>Update</Button>
+            )
+          }
+        />
+
+        <SettingRow
+          label="Active sessions"
+          hint={sessions.length > 0 ? `${sessions.length} active session${sessions.length > 1 ? 's' : ''}` : 'Sign-in devices'}
+          right={
+            showSessions ? (
+              <Button size="sm" variant="ghost" onClick={handleToggleSessions}>Hide</Button>
+            ) : (
+              <Button size="sm" variant="ghost" onClick={handleToggleSessions}>View</Button>
+            )
+          }
+        />
+
+        {showSessions && (
+          <div style={{ marginTop: 8 }}>
+            {sessionsLoading && <div style={{ fontSize: 12, color: 'var(--text-lo)' }}>Loading…</div>}
+            {!sessionsLoading && sessions.length === 0 && (
+              <div style={{ fontSize: 12, color: 'var(--text-lo)' }}>No active sessions found.</div>
+            )}
+            {sessions.map(s => (
+              <div key={s.id} className="row between" style={{ padding: '8px 0', borderTop: '1px solid var(--border-1)', fontSize: 12 }}>
+                <div>
+                  <div style={{ fontWeight: 500 }}>
+                    {s.ipAddress}{s.isCurrent && <span className="chip chip--red chip--mono" style={{ marginLeft: 6, fontSize: 10 }}>current</span>}
+                  </div>
+                  <div style={{ color: 'var(--text-lo)', marginTop: 2 }}>{s.userAgent ?? 'Unknown device'}</div>
+                </div>
+                {!s.isCurrent && (
+                  <Button size="sm" variant="ghost" onClick={() => handleRevokeSession(s.id)}
+                    style={{ color: 'var(--danger)', fontSize: 11 }}>Revoke</Button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </SettingCard>
 
       <SettingCard title="Danger zone">
-        <SettingRow label="Delete account" hint="Permanently removes profile and history" right={<Button size="sm" variant="ghost" icon="trash" style={{ color: 'var(--danger)' }}>Delete</Button>} />
+        <SettingRow
+          label="Delete account"
+          hint="Permanently removes profile and history"
+          right={
+            showDelete ? (
+              <div className="row" style={{ gap: 6 }}>
+                <input
+                  className="input"
+                  type="password"
+                  placeholder="Confirm password"
+                  value={deletePassword}
+                  onChange={e => setDeletePassword(e.target.value)}
+                  style={{ width: 180 }}
+                />
+                <Button size="sm" onClick={handleDeleteAccount}
+                  disabled={deleteLoading || !deletePassword}
+                  style={{ background: 'var(--danger)', borderColor: 'var(--danger)', color: '#fff' }}>
+                  {deleteLoading ? '…' : 'Delete'}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setShowDelete(false)}>Cancel</Button>
+              </div>
+            ) : (
+              <Button size="sm" variant="ghost" icon="trash" style={{ color: 'var(--danger)' }}
+                onClick={() => setShowDelete(true)}>Delete</Button>
+            )
+          }
+        />
       </SettingCard>
     </>
   );
