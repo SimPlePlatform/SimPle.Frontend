@@ -32,6 +32,7 @@ const SAMPLE_PROFILE = {
   color: '#F0394B',
   initials: 'TU',
   visibility: 'Public',
+  profileType: 'Gamer',
   role: 'Player',
   level: 1,
   elo: 1200,
@@ -73,6 +74,16 @@ describe('profileApi', () => {
         body: expect.stringContaining('New Name'),
       }),
     );
+  });
+
+  it('updateMe sends profile type without changing auth or storage configuration', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200, json: () => Promise.resolve({ ...SAMPLE_PROFILE, profileType: 'Developer' }) });
+    const { profileApi } = await import('@/features/profile/profileApi');
+    await profileApi.updateMe({ displayName: 'New Name', visibility: 'Public', profileType: 'Developer' });
+    const body = String(mockFetch.mock.calls[0][1].body);
+    expect(body).toContain('Developer');
+    const forbidden = ['Storage__Access' + 'Key', 'Storage__Secret' + 'Key', 'AWS_SECRET' + '_ACCESS_KEY'];
+    for (const key of forbidden) expect(body).not.toContain(key);
   });
 
   it('updateLinks calls PUT /api/profile/me/links', async () => {

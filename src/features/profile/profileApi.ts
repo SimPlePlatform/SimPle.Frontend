@@ -1,6 +1,7 @@
 import { apiFetch } from '@/lib/api-client';
 
 export type ProfileVisibility = 'Public' | 'FriendsOnly' | 'Private';
+export type ProfileType = 'Gamer' | 'Developer';
 
 export interface ExternalLink {
   id: string;
@@ -24,6 +25,7 @@ export interface UserProfile {
   color: string;
   initials: string;
   visibility: ProfileVisibility;
+  profileType: ProfileType;
   role: string;
   level: number;
   elo: number;
@@ -47,6 +49,7 @@ export interface UpdateProfileRequest {
   region?: string | null;
   statusMessage?: string | null;
   visibility?: ProfileVisibility;
+  profileType?: ProfileType;
 }
 
 export interface UpdateLinksRequest {
