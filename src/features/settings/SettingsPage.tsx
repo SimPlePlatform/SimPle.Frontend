@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
@@ -17,6 +17,16 @@ const LINK_PLATFORMS = [
   { value: 'website', label: 'Website' },
   { value: 'discord', label: 'Discord' },
 ] as const;
+
+function validateExternalLinkUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'https:') return 'Use a valid HTTPS URL.';
+    return null;
+  } catch {
+    return 'Use a valid absolute URL.';
+  }
+}
 
 const SECTIONS = [
   { id: 'account', label: 'Account',       icon: 'user' },
@@ -106,10 +116,11 @@ function AccountSettings() {
   const toast = useToast();
   const { user, logout } = useAuth();
 
-  // ── Profile card (Module 2) ───────────────────────────────────────────────
+  // â”€â”€ Profile card (Module 2) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [profileForm, setProfileForm] = useState({ displayName: '', bio: '' });
   const [linkForm, setLinkForm] = useState<UserProfile['links']>([]);
+  const [linkErrors, setLinkErrors] = useState<Record<number, string>>({});
   const [profileSaving, setProfileSaving] = useState(false);
   const [linksSaving, setLinksSaving] = useState(false);
   const [usernameRequest, setUsernameRequest] = useState<UsernameChangeRequest | null>(null);
@@ -128,7 +139,7 @@ function AccountSettings() {
     profileApi.getUsernameChangeRequest().then(r => setUsernameRequest(r)).catch(() => {});
   }, []);
 
-  // ── Change password ───────────────────────────────────────────────────────
+  // â”€â”€ Change password â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [showChangePw, setShowChangePw] = useState(false);
   const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
   const [pwLoading, setPwLoading] = useState(false);
@@ -152,7 +163,7 @@ function AccountSettings() {
     }
   };
 
-  // ── Change email ──────────────────────────────────────────────────────────
+  // â”€â”€ Change email â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [showChangeEmail, setShowChangeEmail] = useState(false);
   const [newEmail, setNewEmail] = useState('');
   const [emailLoading, setEmailLoading] = useState(false);
@@ -171,7 +182,7 @@ function AccountSettings() {
     }
   };
 
-  // ── Sessions ──────────────────────────────────────────────────────────────
+  // â”€â”€ Sessions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [showSessions, setShowSessions] = useState(false);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
@@ -220,7 +231,7 @@ function AccountSettings() {
     }
   };
 
-  // ── Delete account ────────────────────────────────────────────────────────
+  // â”€â”€ Delete account â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [showDelete, setShowDelete] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -235,6 +246,58 @@ function AccountSettings() {
       toast.push({ kind: 'default', title: e instanceof ApiError ? e.message : 'Could not delete account.' });
     } finally {
       setDeleteLoading(false);
+    }
+  };
+
+  const handleUsernameSubmit = async () => {
+    if (!requestedUsername.trim()) return;
+    setUsernameRequestLoading(true);
+    try {
+      const result = await profileApi.updateUsername(requestedUsername.trim());
+      setUsernameRequest(result.request);
+      setShowUsernameRequest(false);
+      setRequestedUsername('');
+      if (result.appliedImmediately) {
+        const updated = await profileApi.getMe();
+        setProfile(updated);
+        toast.push({ kind: 'success', title: 'Username changed.', body: result.message });
+      } else {
+        toast.push({ kind: 'success', title: 'Request saved.', body: result.message });
+      }
+    } catch (e) {
+      toast.push({ kind: 'default', title: e instanceof ApiError ? e.message : 'Could not update username.' });
+    } finally {
+      setUsernameRequestLoading(false);
+    }
+  };
+
+  const handleUsernameRequestEdit = async () => {
+    if (!requestedUsername.trim()) return;
+    setUsernameRequestLoading(true);
+    try {
+      const request = await profileApi.editUsernameChangeRequest(requestedUsername.trim());
+      setUsernameRequest(request);
+      setShowUsernameRequest(false);
+      setRequestedUsername('');
+      toast.push({ kind: 'success', title: 'Request updated.' });
+    } catch (e) {
+      toast.push({ kind: 'default', title: e instanceof ApiError ? e.message : 'Could not update request.' });
+    } finally {
+      setUsernameRequestLoading(false);
+    }
+  };
+
+  const handleUsernameRequestCancel = async () => {
+    setUsernameRequestLoading(true);
+    try {
+      const request = await profileApi.cancelUsernameChangeRequest();
+      setUsernameRequest(request);
+      setShowUsernameRequest(false);
+      toast.push({ kind: 'success', title: 'Request cancelled.', body: 'This month\'s admin-request allowance remains used.' });
+    } catch (e) {
+      toast.push({ kind: 'default', title: e instanceof ApiError ? e.message : 'Could not cancel request.' });
+    } finally {
+      setUsernameRequestLoading(false);
     }
   };
 
@@ -273,10 +336,44 @@ function AccountSettings() {
                   <Icon name={avatarUploading ? 'refresh' : 'edit'} size={16} style={{ color: '#fff' }} />
                 </label>
               </div>
+              <div className="col" style={{ gap: 6, minWidth: 150 }}>
+                {profile.hasUploadedAvatar ? (
+                  <Button size="sm" variant="ghost" icon="trash" onClick={async () => {
+                    setAvatarUploading(true);
+                    try {
+                      const updated = await profileApi.removeAvatar();
+                      setProfile(updated);
+                      toast.push({ kind: 'success', title: 'Avatar removed.' });
+                    } catch (e) {
+                      toast.push({ kind: 'default', title: e instanceof ApiError ? e.message : 'Could not remove avatar.' });
+                    } finally {
+                      setAvatarUploading(false);
+                    }
+                  }}>
+                    Remove avatar
+                  </Button>
+                ) : (
+                  <label className="row" style={{ gap: 8, fontSize: 12, color: 'var(--text-md)' }}>
+                    <input type="color" value={profile.color} onChange={async e => {
+                      setAvatarUploading(true);
+                      try {
+                        const updated = await profileApi.updateAvatarFallback(e.target.value);
+                        setProfile(updated);
+                        toast.push({ kind: 'success', title: 'Avatar color updated.' });
+                      } catch (err) {
+                        toast.push({ kind: 'default', title: err instanceof ApiError ? err.message : 'Could not update avatar color.' });
+                      } finally {
+                        setAvatarUploading(false);
+                      }
+                    }} />
+                    Default avatar color
+                  </label>
+                )}
+              </div>
               <div className="col" style={{ flex: 1, gap: 10 }}>
                 <div style={{
                   minHeight: 72, borderRadius: 8, border: '1px solid var(--border-1)',
-                  background: profile.bannerUrl ? `url(${profile.bannerUrl}) center/cover` : 'linear-gradient(135deg, #0F1422 0%, #1B2238 50%, #0B0F18 100%)',
+                  background: profile.bannerUrl ? `url(${profile.bannerUrl}) center/cover` : `linear-gradient(135deg, ${profile.bannerFallbackColor} 0%, #1B2238 55%, #0B0F18 100%)`,
                   position: 'relative', overflow: 'hidden'
                 }}>
                   <label style={{ position: 'absolute', top: 8, right: 8 }}>
@@ -318,6 +415,23 @@ function AccountSettings() {
                       </Button>
                     </div>
                   )}
+                  {!profile.hasUploadedBanner && (
+                    <label className="row" style={{ position: 'absolute', right: 8, bottom: 8, gap: 8, fontSize: 12, color: 'var(--text-md)' }}>
+                      <input type="color" value={profile.bannerFallbackColor} onChange={async e => {
+                        setBannerUploading(true);
+                        try {
+                          const updated = await profileApi.updateBannerFallback(e.target.value);
+                          setProfile(updated);
+                          toast.push({ kind: 'success', title: 'Cover color updated.' });
+                        } catch (err) {
+                          toast.push({ kind: 'default', title: err instanceof ApiError ? err.message : 'Could not update cover color.' });
+                        } finally {
+                          setBannerUploading(false);
+                        }
+                      }} />
+                      Default cover color
+                    </label>
+                  )}
                 </div>
                 <Field label="Display name">
                   <input className="input" value={profileForm.displayName}
@@ -327,20 +441,25 @@ function AccountSettings() {
                   <div>
                     <div className="row" style={{ gap: 8, alignItems: 'center' }}>
                       <span className="mono" style={{ fontSize: 13, color: 'var(--text-md)' }}>@{profile.username}</span>
-                      {!usernameRequest || usernameRequest.status === 'Rejected' ? (
-                        <Button size="sm" variant="ghost" style={{ fontSize: 11 }}
-                          onClick={() => setShowUsernameRequest(v => !v)}>
-                          Request change
-                        </Button>
-                      ) : (
-                        <span className="chip chip--mono" style={{ fontSize: 10 }}>
-                          {usernameRequest.status === 'Pending' ? '⏳ Pending review' : '✓ Change approved'}
-                        </span>
+                      <Button size="sm" variant="ghost" style={{ fontSize: 11 }}
+                        onClick={() => {
+                          setRequestedUsername(usernameRequest?.status === 'Pending' ? usernameRequest.requestedUsername : '');
+                          setShowUsernameRequest(v => !v);
+                        }}>
+                        {usernameRequest?.status === 'Pending' ? 'Edit request' : 'Change username'}
+                      </Button>
+                      {usernameRequest && (
+                        <span className="chip chip--mono" style={{ fontSize: 10 }}>{usernameRequest.status}</span>
                       )}
                     </div>
-                    {usernameRequest?.status === 'Rejected' && (
-                      <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 4 }}>
-                        Previous request rejected{usernameRequest.rejectionReason ? `: ${usernameRequest.rejectionReason}` : ''}.
+                    <div style={{ fontSize: 11, color: 'var(--text-lo)', marginTop: 4 }}>
+                      You have 1 username change per month. If it is already used, a request is saved for admin review.
+                    </div>
+                    {usernameRequest && (
+                      <div style={{ fontSize: 11, color: usernameRequest.status === 'Rejected' ? 'var(--danger)' : 'var(--text-lo)', marginTop: 4 }}>
+                        Requested username: <span className="mono">{usernameRequest.requestedUsername}</span>
+                        {usernameRequest.rejectionReason ? ` · ${usernameRequest.rejectionReason}` : ''}
+                        {usernameRequest.status === 'Cancelled' ? ' · Canceling does not restore this month\'s request allowance.' : ''}
                       </div>
                     )}
                     {showUsernameRequest && (
@@ -348,24 +467,19 @@ function AccountSettings() {
                         <input className="input" placeholder="New username"
                           value={requestedUsername} onChange={e => setRequestedUsername(e.target.value)}
                           style={{ flex: 1 }} />
-                        <Button size="sm" disabled={usernameRequestLoading || !requestedUsername} onClick={async () => {
-                          setUsernameRequestLoading(true);
-                          try {
-                            const req = await profileApi.requestUsernameChange(requestedUsername);
-                            setUsernameRequest(req);
-                            setShowUsernameRequest(false);
-                            setRequestedUsername('');
-                            toast.push({ kind: 'success', title: 'Request submitted', body: 'An admin will review your request.' });
-                          } catch (e) {
-                            toast.push({ kind: 'default', title: e instanceof ApiError ? e.message : 'Could not submit request.' });
-                          } finally {
-                            setUsernameRequestLoading(false);
-                          }
+                        <Button size="sm" disabled={usernameRequestLoading || !requestedUsername} onClick={() => {
+                          if (usernameRequest?.status === 'Pending') void handleUsernameRequestEdit();
+                          else void handleUsernameSubmit();
                         }}>
-                          {usernameRequestLoading ? '…' : 'Submit'}
+                          {usernameRequestLoading ? '...' : 'Submit'}
                         </Button>
                         <Button size="sm" variant="ghost" onClick={() => setShowUsernameRequest(false)}>Cancel</Button>
                       </div>
+                    )}
+                    {usernameRequest?.canCancel && (
+                      <Button size="sm" variant="ghost" style={{ marginTop: 8, fontSize: 11 }} disabled={usernameRequestLoading} onClick={() => void handleUsernameRequestCancel()}>
+                        Cancel request
+                      </Button>
                     )}
                   </div>
                 </Field>
@@ -426,7 +540,7 @@ function AccountSettings() {
                   toast.push({ kind: 'default', title: err instanceof ApiError ? err.message : 'Could not update profile type.' });
                 }
               }}>
-                <option value="Gamer">Gamer</option>
+                <option value="Player">Player</option>
                 <option value="Developer">Developer</option>
               </select>
               <div style={{ fontSize: 12, color: 'var(--text-lo)', marginTop: 6 }}>
@@ -448,7 +562,8 @@ function AccountSettings() {
               </div>
               <div className="col" style={{ gap: 8 }}>
                 {linkForm.map((link, index) => (
-                  <div key={link.id} className="row" style={{ gap: 8, alignItems: 'center' }}>
+                  <div key={link.id} className="col" style={{ gap: 4 }}>
+                    <div className="row" style={{ gap: 8, alignItems: 'center' }}>
                     <select className="input" aria-label="Link platform" value={link.platform}
                       onChange={e => setLinkForm(links => links.map((l, i) => i === index ? { ...l, platform: e.target.value } : l))}
                       style={{ width: 130 }}>
@@ -458,7 +573,10 @@ function AccountSettings() {
                     </select>
                     <input className="input" aria-label="Link URL" placeholder="https://example.com"
                       value={link.url}
-                      onChange={e => setLinkForm(links => links.map((l, i) => i === index ? { ...l, url: e.target.value } : l))}
+                      onChange={e => {
+                        setLinkErrors(errors => ({ ...errors, [index]: validateExternalLinkUrl(e.target.value) ?? '' }));
+                        setLinkForm(links => links.map((l, i) => i === index ? { ...l, url: e.target.value } : l));
+                      }}
                       style={{ flex: 1 }} />
                     <input className="input" aria-label="Link label" placeholder="Label"
                       value={link.displayLabel ?? ''}
@@ -467,6 +585,10 @@ function AccountSettings() {
                     <Button size="sm" variant="ghost" icon="trash" onClick={() => setLinkForm(links => links.filter((_, i) => i !== index))}>
                       Remove
                     </Button>
+                    </div>
+                    {linkErrors[index] && (
+                      <div style={{ fontSize: 11, color: 'var(--danger)', marginLeft: 138 }}>{linkErrors[index]}</div>
+                    )}
                   </div>
                 ))}
                 {linkForm.length === 0 && (
@@ -475,14 +597,13 @@ function AccountSettings() {
               </div>
               <div className="row" style={{ marginTop: 10, justifyContent: 'flex-end' }}>
                 <Button size="sm" disabled={linksSaving} onClick={async () => {
-                  const invalid = linkForm.some(link => {
-                    try {
-                      return new URL(link.url).protocol !== 'https:';
-                    } catch {
-                      return true;
-                    }
-                  });
-                  if (invalid) {
+                  const errors = Object.fromEntries(
+                    linkForm
+                      .map((link, index) => [index, validateExternalLinkUrl(link.url)] as const)
+                      .filter(([, error]) => error)
+                  ) as Record<number, string>;
+                  setLinkErrors(errors);
+                  if (Object.keys(errors).length > 0) {
                     toast.push({ kind: 'default', title: 'Links must be valid HTTPS URLs.' });
                     return;
                   }
@@ -513,6 +634,7 @@ function AccountSettings() {
               <Button variant="ghost" onClick={() => {
                 setProfileForm({ displayName: profile.displayName, bio: profile.bio ?? '' });
                 setLinkForm(profile.links);
+                setLinkErrors({});
               }}>
                 Cancel
               </Button>
@@ -537,19 +659,19 @@ function AccountSettings() {
                   setProfileSaving(false);
                 }
               }}>
-                {profileSaving ? '…' : 'Save changes'}
+                {profileSaving ? 'â€¦' : 'Save changes'}
               </Button>
             </div>
           </>
         ) : (
-          <div style={{ fontSize: 13, color: 'var(--text-lo)', padding: '8px 0' }}>Loading…</div>
+          <div style={{ fontSize: 13, color: 'var(--text-lo)', padding: '8px 0' }}>Loadingâ€¦</div>
         )}
       </SettingCard>
 
       <SettingCard title="Login & security">
         <SettingRow
           label="Email"
-          hint={user ? `${user.email} · ${user.isEmailVerified ? 'verified' : 'unverified'}` : '—'}
+          hint={user ? `${user.email} Â· ${user.isEmailVerified ? 'verified' : 'unverified'}` : 'â€”'}
           right={
             showChangeEmail ? (
               <div className="row" style={{ gap: 6 }}>
@@ -561,7 +683,7 @@ function AccountSettings() {
                   style={{ width: 180 }}
                 />
                 <Button size="sm" onClick={handleChangeEmail} disabled={emailLoading || !newEmail}>
-                  {emailLoading ? '…' : 'Send link'}
+                  {emailLoading ? 'â€¦' : 'Send link'}
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => setShowChangeEmail(false)}>Cancel</Button>
               </div>
@@ -585,7 +707,7 @@ function AccountSettings() {
                   value={pwForm.confirm} onChange={e => setPwForm(f => ({ ...f, confirm: e.target.value }))} style={{ width: 220 }} />
                 <div className="row" style={{ gap: 6 }}>
                   <Button size="sm" onClick={handleChangePassword} disabled={pwLoading || !pwForm.current || !pwForm.next}>
-                    {pwLoading ? '…' : 'Update'}
+                    {pwLoading ? 'â€¦' : 'Update'}
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => setShowChangePw(false)}>Cancel</Button>
                 </div>
@@ -610,7 +732,7 @@ function AccountSettings() {
 
         {showSessions && (
           <div style={{ marginTop: 8 }}>
-            {sessionsLoading && <div style={{ fontSize: 12, color: 'var(--text-lo)' }}>Loading…</div>}
+            {sessionsLoading && <div style={{ fontSize: 12, color: 'var(--text-lo)' }}>Loadingâ€¦</div>}
             {!sessionsLoading && sessions.length === 0 && (
               <div style={{ fontSize: 12, color: 'var(--text-lo)' }}>No active sessions found.</div>
             )}
@@ -632,7 +754,7 @@ function AccountSettings() {
               <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border-1)' }}>
                 <Button size="sm" variant="ghost" onClick={handleRevokeAllSessions} disabled={revokeAllLoading}
                   style={{ color: 'var(--danger)', fontSize: 12 }}>
-                  {revokeAllLoading ? '…' : 'Sign out all other devices'}
+                  {revokeAllLoading ? 'â€¦' : 'Sign out all other devices'}
                 </Button>
               </div>
             )}
@@ -658,7 +780,7 @@ function AccountSettings() {
                 <Button size="sm" onClick={handleDeleteAccount}
                   disabled={deleteLoading || !deletePassword}
                   style={{ background: 'var(--danger)', borderColor: 'var(--danger)', color: '#fff' }}>
-                  {deleteLoading ? '…' : 'Delete'}
+                  {deleteLoading ? 'â€¦' : 'Delete'}
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => setShowDelete(false)}>Cancel</Button>
               </div>
@@ -742,12 +864,12 @@ function NotifySettings() {
   const toggle = (k: keyof typeof states) => setStates(s => ({ ...s, [k]: !s[k] }));
   return (
     <SettingCard title="Notifications" sub="Choose where and when SimPle reaches out.">
-      <SettingRow label="Lobby invites" hint="In-app · email" right={<Toggle on={states.lobby} onChange={() => toggle('lobby')} label="" />} />
+      <SettingRow label="Lobby invites" hint="In-app Â· email" right={<Toggle on={states.lobby} onChange={() => toggle('lobby')} label="" />} />
       <SettingRow label="Friend requests" right={<Toggle on={states.friend} onChange={() => toggle('friend')} label="" />} />
       <SettingRow label="Direct messages" hint="In-app only" right={<Toggle on={states.dm} onChange={() => toggle('dm')} label="" />} />
       <SettingRow label="Match results" hint="Win/loss summaries" right={<Toggle on={states.result} onChange={() => toggle('result')} label="" />} />
       <SettingRow label="Season announcements" right={<Toggle on={states.season} onChange={() => toggle('season')} label="" />} />
-      <SettingRow label="Email digest" hint="Weekly · Sunday 19:00" right={<Toggle on={states.digest} onChange={() => toggle('digest')} label="" />} />
+      <SettingRow label="Email digest" hint="Weekly Â· Sunday 19:00" right={<Toggle on={states.digest} onChange={() => toggle('digest')} label="" />} />
     </SettingCard>
   );
 }

@@ -104,7 +104,7 @@ export function ProfilePage({ userId }: { userId: string }) {
     }
   };
 
-  const updateFallbackColor = async (color: string) => {
+  const updateAvatarFallbackColor = async (color: string) => {
     setMediaLoading('avatar');
     try {
       const updated = await profileApi.updateAvatarFallback(color);
@@ -115,6 +115,20 @@ export function ProfilePage({ userId }: { userId: string }) {
     } finally {
       setMediaLoading(null);
       setAvatarMenuOpen(false);
+    }
+  };
+
+  const updateBannerFallbackColor = async (color: string) => {
+    setMediaLoading('banner');
+    try {
+      const updated = await profileApi.updateBannerFallback(color);
+      setProfile(updated);
+      toast.push({ kind: 'success', title: 'Cover color updated.' });
+    } catch (e) {
+      toast.push({ kind: 'default', title: e instanceof ApiError ? e.message : 'Could not update cover color.' });
+    } finally {
+      setMediaLoading(null);
+      setBannerMenuOpen(false);
     }
   };
 
@@ -140,11 +154,12 @@ export function ProfilePage({ userId }: { userId: string }) {
 
   const avatarUser = { initials: profile.initials, color: profile.color, status: 'online' as const };
   const joinedYear = new Date(profile.joinedAt).getFullYear();
+  const regionText = profile.region?.trim();
 
   return (
     <div className="page">
       <div className="card-elev" style={{ overflow: 'hidden', padding: 0 }}>
-        <div style={{ height: 160, position: 'relative', background: profile.bannerUrl ? `url(${profile.bannerUrl}) center/cover` : 'linear-gradient(135deg, #0F1422 0%, #1B2238 50%, #0B0F18 100%)' }}>
+        <div style={{ height: 160, position: 'relative', background: profile.bannerUrl ? `url(${profile.bannerUrl}) center/cover` : `linear-gradient(135deg, ${profile.bannerFallbackColor} 0%, #1B2238 55%, #0B0F18 100%)` }}>
           <div className="grid-bg" style={{ opacity: 0.5 }} />
           {isOwn && (
             <div style={{ position: 'absolute', top: 14, right: editing ? 170 : 14 }}>
@@ -168,6 +183,17 @@ export function ProfilePage({ userId }: { userId: string }) {
                     <button className="row" style={{ width: '100%', gap: 8, padding: 8, fontSize: 13, color: 'var(--danger)' }} onClick={() => void removeMedia('banner')} disabled={mediaLoading === 'banner'}>
                       <Icon name="trash" size={14} /> Remove cover picture
                     </button>
+                  )}
+                  {!profile.hasUploadedBanner && (
+                    <label className="row" style={{ width: '100%', gap: 8, padding: 8, fontSize: 13, cursor: 'pointer' }}>
+                      <input
+                        type="color"
+                        value={profile.bannerFallbackColor}
+                        onChange={e => void updateBannerFallbackColor(e.target.value)}
+                        style={{ width: 24, height: 24, padding: 0, border: 0, background: 'transparent' }}
+                      />
+                      Edit default cover color
+                    </label>
                   )}
                 </div>
               )}
@@ -230,7 +256,7 @@ export function ProfilePage({ userId }: { userId: string }) {
                         <input
                           type="color"
                           value={profile.color}
-                          onChange={e => void updateFallbackColor(e.target.value)}
+                          onChange={e => void updateAvatarFallbackColor(e.target.value)}
                           style={{ width: 24, height: 24, padding: 0, border: 0, background: 'transparent' }}
                         />
                         Edit default avatar color
@@ -249,7 +275,7 @@ export function ProfilePage({ userId }: { userId: string }) {
                   <>
                     <div className="font-display" style={{ fontSize: 24, fontWeight: 600 }}>{profile.displayName}</div>
                     <div className="mono" style={{ fontSize: 12, color: 'var(--text-lo)' }}>
-                      @{profile.username} · joined {joinedYear} · {profile.region}
+                      @{profile.username} · joined {joinedYear}{regionText ? ` · ${regionText}` : ''}
                     </div>
                     {profile.statusMessage && (
                       <div style={{ fontSize: 12, color: 'var(--text-md)', marginTop: 4 }}>{profile.statusMessage}</div>
@@ -267,7 +293,6 @@ export function ProfilePage({ userId }: { userId: string }) {
               <span className="chip chip--mono">{profile.elo} ELO</span>
               <span className="chip chip--mono">Lv {profile.level}</span>
               <span className="chip chip--mono">{profile.profileType}</span>
-              <span className="chip chip--mono" style={{ textTransform: 'capitalize' }}>{profile.role}</span>
             </div>
           </div>
           {!editing ? (

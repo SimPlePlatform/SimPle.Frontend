@@ -1,7 +1,7 @@
 import { apiFetch } from '@/lib/api-client';
 
 export type ProfileVisibility = 'Public' | 'FriendsOnly' | 'Private';
-export type ProfileType = 'Gamer' | 'Developer';
+export type ProfileType = 'Player' | 'Developer';
 
 export interface ExternalLink {
   id: string;
@@ -23,6 +23,7 @@ export interface UserProfile {
   statusMessage: string | null;
   region: string;
   color: string;
+  bannerFallbackColor: string;
   initials: string;
   visibility: ProfileVisibility;
   profileType: ProfileType;
@@ -59,10 +60,22 @@ export interface UpdateLinksRequest {
 export interface UsernameChangeRequest {
   id: string;
   requestedUsername: string;
-  status: 'Pending' | 'Accepted' | 'Rejected';
+  status: 'Pending' | 'Accepted' | 'Rejected' | 'Cancelled';
   rejectionReason: string | null;
+  requestYear: number;
+  requestMonth: number;
   createdAt: string;
+  updatedAt: string;
+  cancelledAt: string | null;
   reviewedAt: string | null;
+  canEdit: boolean;
+  canCancel: boolean;
+}
+
+export interface UsernameChangeResult {
+  appliedImmediately: boolean;
+  message: string;
+  request: UsernameChangeRequest | null;
 }
 
 export const profileApi = {
@@ -73,10 +86,16 @@ export const profileApi = {
     apiFetch<UserProfile>('/api/profile/me', 'PUT', request),
 
   updateUsername: (username: string) =>
-    apiFetch<void>('/api/profile/me/username', 'PUT', { username }),
+    apiFetch<UsernameChangeResult>('/api/profile/me/username', 'PUT', { username }),
 
   requestUsernameChange: (username: string) =>
     apiFetch<UsernameChangeRequest>('/api/profile/me/username-change-request', 'POST', { username }),
+
+  editUsernameChangeRequest: (username: string) =>
+    apiFetch<UsernameChangeRequest>('/api/profile/me/username-change-request', 'PUT', { username }),
+
+  cancelUsernameChangeRequest: () =>
+    apiFetch<UsernameChangeRequest>('/api/profile/me/username-change-request', 'DELETE'),
 
   getUsernameChangeRequest: () =>
     apiFetch<UsernameChangeRequest | null>('/api/profile/me/username-change-request'),
@@ -102,6 +121,8 @@ export const profileApi = {
   removeBanner: () => apiFetch<UserProfile>('/api/profile/me/banner', 'DELETE'),
   updateAvatarFallback: (color: string) =>
     apiFetch<UserProfile>('/api/profile/me/avatar/fallback', 'PUT', { color }),
+  updateBannerFallback: (color: string) =>
+    apiFetch<UserProfile>('/api/profile/me/banner/fallback', 'PUT', { color }),
 };
 
 async function uploadProfileMedia(file: File, kind: 'avatar' | 'banner'): Promise<UserProfile> {
