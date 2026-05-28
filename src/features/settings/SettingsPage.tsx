@@ -149,9 +149,11 @@ function AccountSettings() {
   const [usernameRequestLoading, setUsernameRequestLoading] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [bannerUploading, setBannerUploading] = useState(false);
-  // Local color state — preview only. Saved explicitly on blur or button press.
+  // Local color state — preview while picking. Saved with the main Save button.
   const [localAvatarColor, setLocalAvatarColor] = useState<string | null>(null);
   const [localBannerColor, setLocalBannerColor] = useState<string | null>(null);
+  // Warn when Save Changes is clicked while there are unsaved link edits.
+  const [linksConflict, setLinksConflict] = useState(false);
 
   useEffect(() => {
     profileApi.getMe().then(p => {
@@ -371,33 +373,14 @@ function AccountSettings() {
                     Remove avatar
                   </Button>
                 ) : (
-                  <div className="col" style={{ gap: 6 }}>
-                    <label className="row" style={{ gap: 8, fontSize: 12, color: 'var(--text-md)' }}>
-                      <input
-                        type="color"
-                        value={localAvatarColor ?? profile.color}
-                        onChange={e => setLocalAvatarColor(e.target.value)}
-                        onBlur={async e => {
-                          const color = e.target.value;
-                          if (color === profile.color) return;
-                          setAvatarUploading(true);
-                          try {
-                            const updated = await profileApi.updateAvatarFallback(color);
-                            setProfile(updated);
-                            setLocalAvatarColor(updated.color);
-                            toast.push({ kind: 'success', title: 'Avatar color saved.' });
-                          } catch (err) {
-                            setLocalAvatarColor(profile.color);
-                            toast.push({ kind: 'default', title: err instanceof ApiError ? err.message : 'Could not update avatar color.' });
-                          } finally {
-                            setAvatarUploading(false);
-                          }
-                        }}
-                      />
-                      Default avatar color
-                    </label>
-                    <div style={{ fontSize: 11, color: 'var(--text-lo)' }}>Close the picker to save.</div>
-                  </div>
+                  <label className="row" style={{ gap: 8, fontSize: 12, color: 'var(--text-md)' }}>
+                    <input
+                      type="color"
+                      value={localAvatarColor ?? profile.color}
+                      onChange={e => setLocalAvatarColor(e.target.value)}
+                    />
+                    Default avatar color
+                  </label>
                 )}
               </div>
               <div className="col" style={{ flex: 1, gap: 10 }}>
@@ -451,22 +434,6 @@ function AccountSettings() {
                         type="color"
                         value={localBannerColor ?? profile.bannerFallbackColor}
                         onChange={e => setLocalBannerColor(e.target.value)}
-                        onBlur={async e => {
-                          const color = e.target.value;
-                          if (color === profile.bannerFallbackColor) return;
-                          setBannerUploading(true);
-                          try {
-                            const updated = await profileApi.updateBannerFallback(color);
-                            setProfile(updated);
-                            setLocalBannerColor(updated.bannerFallbackColor);
-                            toast.push({ kind: 'success', title: 'Cover color saved.' });
-                          } catch (err) {
-                            setLocalBannerColor(profile.bannerFallbackColor);
-                            toast.push({ kind: 'default', title: err instanceof ApiError ? err.message : 'Could not update cover color.' });
-                          } finally {
-                            setBannerUploading(false);
-                          }
-                        }}
                       />
                       Default cover color
                     </label>
@@ -608,7 +575,14 @@ function AccountSettings() {
                   <div style={{ fontSize: 12, color: 'var(--text-lo)' }}>No web profiles linked.</div>
                 )}
               </div>
-              <div className="row" style={{ marginTop: 10, justifyContent: 'flex-end' }}>
+              <div className="row" style={{ marginTop: 10, justifyContent: 'flex-end', gap: 8 }}>
+                <Button size="sm" variant="ghost" onClick={() => {
+                  setLinkForm(profile.links);
+                  setLinkErrors({});
+                  setLinksConflict(false);
+                }}>
+                  Revert
+                </Button>
                 <Button size="sm" disabled={linksSaving} onClick={async () => {
                   const errors = Object.fromEntries(
                     linkForm
@@ -632,6 +606,7 @@ function AccountSettings() {
                     });
                     setLinkForm(updatedLinks);
                     setProfile({ ...profile, links: updatedLinks });
+                    setLinksConflict(false);
                     toast.push({ kind: 'success', title: 'Web profiles updated.' });
                   } catch (e) {
                     toast.push({ kind: 'default', title: e instanceof ApiError ? e.message : 'Could not update web profiles.' });
@@ -643,17 +618,92 @@ function AccountSettings() {
                 </Button>
               </div>
             </div>
+            {linksConflict && (
+              <div className="card" style={{ marginTop: 12, padding: 14, border: '1px solid var(--warning, #F59E0B)', borderRadius: 8 }}>
+                <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>
+                  You have unsaved changes in Web profiles.
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-lo)', marginBottom: 12 }}>
+                  Save them now, or discard them to keep only the profile changes above.
+                </div>
+                <div className="row" style={{ gap: 8 }}>
+                  <Button size="sm" disabled={linksSaving} onClick={async () => {
+                    const errors = Object.fromEntries(
+                      linkForm
+                        .map((link, index) => [index, validateLinkForPlatform(link.platform, link.url)] as const)
+                        .filter(([, error]) => error)
+                    ) as Record<number, string>;
+                    if (Object.keys(errors).length > 0) {
+                      setLinkErrors(errors);
+                      toast.push({ kind: 'default', title: 'Fix link errors first.' });
+                      return;
+                    }
+                    setLinksSaving(true);
+                    try {
+                      const updatedLinks = await profileApi.updateLinks({
+                        links: linkForm.map((link, index) => ({
+                          platform: link.platform,
+                          url: link.url,
+                          displayLabel: link.displayLabel,
+                          sortOrder: index,
+                        })),
+                      });
+                      setLinkForm(updatedLinks);
+                      setProfile({ ...profile, links: updatedLinks });
+                      setLinksConflict(false);
+                      toast.push({ kind: 'success', title: 'Web profiles saved.' });
+                    } catch (e) {
+                      toast.push({ kind: 'default', title: e instanceof ApiError ? e.message : 'Could not save web profiles.' });
+                    } finally {
+                      setLinksSaving(false);
+                    }
+                  }}>
+                    {linksSaving ? '…' : 'Save web profiles too'}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => {
+                    setLinkForm(profile.links);
+                    setLinkErrors({});
+                    setLinksConflict(false);
+                  }}>
+                    Discard link changes
+                  </Button>
+                </div>
+              </div>
+            )}
             <div className="row" style={{ marginTop: 14, justifyContent: 'flex-end', gap: 8 }}>
               <Button variant="ghost" onClick={() => {
                 setProfileForm({ displayName: profile.displayName, bio: profile.bio ?? '', visibility: profile.visibility, profileType: profile.profileType });
+                setLocalAvatarColor(profile.color);
+                setLocalBannerColor(profile.bannerFallbackColor);
                 setLinkForm(profile.links);
                 setLinkErrors({});
+                setLinksConflict(false);
               }}>
                 Cancel
               </Button>
               <Button disabled={profileSaving} onClick={async () => {
+                // Check for unsaved link edits before saving profile.
+                const linksChanged = JSON.stringify(linkForm.map(l => ({ platform: l.platform, url: l.url, displayLabel: l.displayLabel })))
+                  !== JSON.stringify(profile.links.map(l => ({ platform: l.platform, url: l.url, displayLabel: l.displayLabel })));
+                if (linksChanged && !linksConflict) {
+                  setLinksConflict(true);
+                  return;
+                }
+                setLinksConflict(false);
                 setProfileSaving(true);
                 try {
+                  // Save avatar color if changed.
+                  if (localAvatarColor && localAvatarColor !== profile.color) {
+                    const colorResult = await profileApi.updateAvatarFallback(localAvatarColor);
+                    setProfile(colorResult);
+                    setLocalAvatarColor(colorResult.color);
+                  }
+                  // Save banner color if changed.
+                  if (localBannerColor && localBannerColor !== profile.bannerFallbackColor) {
+                    const colorResult = await profileApi.updateBannerFallback(localBannerColor);
+                    setProfile(colorResult);
+                    setLocalBannerColor(colorResult.bannerFallbackColor);
+                  }
                   const updated = await profileApi.updateMe({
                     displayName: profileForm.displayName,
                     bio: profileForm.bio || null,
