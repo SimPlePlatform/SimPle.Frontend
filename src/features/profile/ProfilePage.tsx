@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
 import { Icon } from '@/components/ui/Icons';
@@ -23,7 +23,12 @@ export function ProfilePage({ userId }: { userId: string }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saveLoading, setSaveLoading] = useState(false);
+  const [mediaLoading, setMediaLoading] = useState<'avatar' | 'banner' | null>(null);
+  const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
+  const [bannerMenuOpen, setBannerMenuOpen] = useState(false);
   const [editForm, setEditForm] = useState({ displayName: '', bio: '' });
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
 
   const isOwn = authUser?.id === userId;
 
@@ -63,6 +68,55 @@ export function ProfilePage({ userId }: { userId: string }) {
     }
   };
 
+  const uploadMedia = async (kind: 'avatar' | 'banner', file: File | undefined) => {
+    if (!file) return;
+    setMediaLoading(kind);
+    try {
+      const updated = kind === 'avatar'
+        ? await profileApi.uploadAvatar(file)
+        : await profileApi.uploadBanner(file);
+      setProfile(updated);
+      toast.push({ kind: 'success', title: kind === 'avatar' ? 'Avatar updated.' : 'Cover updated.' });
+    } catch (e) {
+      toast.push({ kind: 'default', title: e instanceof Error ? e.message : 'Upload failed.' });
+    } finally {
+      setMediaLoading(null);
+      setAvatarMenuOpen(false);
+      setBannerMenuOpen(false);
+    }
+  };
+
+  const removeMedia = async (kind: 'avatar' | 'banner') => {
+    setMediaLoading(kind);
+    try {
+      const updated = kind === 'avatar'
+        ? await profileApi.removeAvatar()
+        : await profileApi.removeBanner();
+      setProfile(updated);
+      toast.push({ kind: 'success', title: kind === 'avatar' ? 'Avatar removed.' : 'Cover removed.' });
+    } catch (e) {
+      toast.push({ kind: 'default', title: e instanceof ApiError ? e.message : 'Could not remove media.' });
+    } finally {
+      setMediaLoading(null);
+      setAvatarMenuOpen(false);
+      setBannerMenuOpen(false);
+    }
+  };
+
+  const updateFallbackColor = async (color: string) => {
+    setMediaLoading('avatar');
+    try {
+      const updated = await profileApi.updateAvatarFallback(color);
+      setProfile(updated);
+      toast.push({ kind: 'success', title: 'Avatar color updated.' });
+    } catch (e) {
+      toast.push({ kind: 'default', title: e instanceof ApiError ? e.message : 'Could not update avatar color.' });
+    } finally {
+      setMediaLoading(null);
+      setAvatarMenuOpen(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="page">
@@ -92,7 +146,34 @@ export function ProfilePage({ userId }: { userId: string }) {
         <div style={{ height: 160, position: 'relative', background: profile.bannerUrl ? `url(${profile.bannerUrl}) center/cover` : 'linear-gradient(135deg, #0F1422 0%, #1B2238 50%, #0B0F18 100%)' }}>
           <div className="grid-bg" style={{ opacity: 0.5 }} />
           {isOwn && (
-            <div style={{ position: 'absolute', top: 14, right: 14 }}>
+            <div style={{ position: 'absolute', top: 14, right: editing ? 170 : 14 }}>
+              <input
+                ref={bannerInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                hidden
+                onChange={e => {
+                  void uploadMedia('banner', e.target.files?.[0]);
+                  e.target.value = '';
+                }}
+              />
+              <Button size="sm" variant="ghost" icon="more" aria-label="Cover options" onClick={() => setBannerMenuOpen(v => !v)} />
+              {bannerMenuOpen && (
+                <div className="card" style={{ position: 'absolute', top: 36, right: 0, zIndex: 5, minWidth: 190, padding: 6 }}>
+                  <button className="row" style={{ width: '100%', gap: 8, padding: 8, fontSize: 13 }} onClick={() => bannerInputRef.current?.click()}>
+                    <Icon name="edit" size={14} /> {profile.hasUploadedBanner ? 'Change cover picture' : 'Upload cover picture'}
+                  </button>
+                  {profile.hasUploadedBanner && (
+                    <button className="row" style={{ width: '100%', gap: 8, padding: 8, fontSize: 13, color: 'var(--danger)' }} onClick={() => void removeMedia('banner')} disabled={mediaLoading === 'banner'}>
+                      <Icon name="trash" size={14} /> Remove cover picture
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          {isOwn && (
+            <div style={{ position: 'absolute', top: 14, left: 14 }}>
               {editing ? (
                 <div className="row" style={{ gap: 6 }}>
                   <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
@@ -111,7 +192,57 @@ export function ProfilePage({ userId }: { userId: string }) {
         <div style={{ padding: '0 24px 24px', marginTop: -44 }}>
           <div className="row between" style={{ alignItems: 'flex-end', flexWrap: 'wrap', gap: 12 }}>
             <div className="row" style={{ gap: 18, alignItems: 'flex-end' }}>
-              <Avatar user={avatarUser} size="xl" showPresence />
+              <div style={{ position: 'relative' }}>
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  hidden
+                  onChange={e => {
+                    void uploadMedia('avatar', e.target.files?.[0]);
+                    e.target.value = '';
+                  }}
+                />
+                <Avatar user={avatarUser} src={profile.avatarUrl} size="xl" showPresence />
+                {isOwn && (
+                  <button
+                    aria-label="Avatar options"
+                    onClick={() => setAvatarMenuOpen(v => !v)}
+                    style={{
+                      position: 'absolute', inset: 0, borderRadius: '50%',
+                      background: 'rgba(0,0,0,0.42)', color: '#fff',
+                      display: 'grid', placeItems: 'center', opacity: avatarMenuOpen || mediaLoading === 'avatar' ? 1 : 0,
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                    onMouseLeave={e => !avatarMenuOpen && mediaLoading !== 'avatar' && (e.currentTarget.style.opacity = '0')}
+                  >
+                    <Icon name={mediaLoading === 'avatar' ? 'refresh' : 'edit'} size={18} />
+                  </button>
+                )}
+                {avatarMenuOpen && (
+                  <div className="card" style={{ position: 'absolute', left: 0, top: 84, zIndex: 5, minWidth: 210, padding: 6 }}>
+                    <button className="row" style={{ width: '100%', gap: 8, padding: 8, fontSize: 13 }} onClick={() => avatarInputRef.current?.click()}>
+                      <Icon name="edit" size={14} /> Upload profile picture
+                    </button>
+                    {!profile.hasUploadedAvatar && (
+                      <label className="row" style={{ width: '100%', gap: 8, padding: 8, fontSize: 13, cursor: 'pointer' }}>
+                        <input
+                          type="color"
+                          value={profile.color}
+                          onChange={e => void updateFallbackColor(e.target.value)}
+                          style={{ width: 24, height: 24, padding: 0, border: 0, background: 'transparent' }}
+                        />
+                        Edit default avatar color
+                      </label>
+                    )}
+                    {profile.hasUploadedAvatar && (
+                      <button className="row" style={{ width: '100%', gap: 8, padding: 8, fontSize: 13, color: 'var(--danger)' }} onClick={() => void removeMedia('avatar')} disabled={mediaLoading === 'avatar'}>
+                        <Icon name="trash" size={14} /> Remove profile picture
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
               <div style={{ paddingBottom: 6 }}>
                 {!editing ? (
                   <>

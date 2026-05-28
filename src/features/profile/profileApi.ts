@@ -17,6 +17,8 @@ export interface UserProfile {
   bio: string | null;
   avatarUrl: string | null;
   bannerUrl: string | null;
+  hasUploadedAvatar: boolean;
+  hasUploadedBanner: boolean;
   statusMessage: string | null;
   region: string;
   color: string;
@@ -28,6 +30,13 @@ export interface UserProfile {
   joinedAt: string;
   links: ExternalLink[];
   interests: string[];
+}
+
+interface UploadUrlResponse {
+  uploadUrl: string;
+  objectKey: string;
+  contentType: string;
+  expiresAtUtc: string;
 }
 
 export interface UpdateProfileRequest {
@@ -84,31 +93,35 @@ export const profileApi = {
   updateInterests: (interests: string[]) =>
     apiFetch<string[]>('/api/profile/me/interests', 'PUT', { interests }),
 
-  uploadAvatar: (file: File) => {
-    const form = new FormData();
-    form.append('file', file);
-    return fetch(`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5147'}/api/profile/me/avatar`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'X-Requested-With': 'XMLHttpRequest' },
-      body: form,
-    }).then(async r => {
-      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error?.message ?? 'Upload failed.');
-      return r.json() as Promise<UserProfile>;
-    });
-  },
-
-  uploadBanner: (file: File) => {
-    const form = new FormData();
-    form.append('file', file);
-    return fetch(`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5147'}/api/profile/me/banner`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'X-Requested-With': 'XMLHttpRequest' },
-      body: form,
-    }).then(async r => {
-      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error?.message ?? 'Upload failed.');
-      return r.json() as Promise<UserProfile>;
-    });
-  },
+  uploadAvatar: (file: File) => uploadProfileMedia(file, 'avatar'),
+  uploadBanner: (file: File) => uploadProfileMedia(file, 'banner'),
+  removeAvatar: () => apiFetch<UserProfile>('/api/profile/me/avatar', 'DELETE'),
+  removeBanner: () => apiFetch<UserProfile>('/api/profile/me/banner', 'DELETE'),
+  updateAvatarFallback: (color: string) =>
+    apiFetch<UserProfile>('/api/profile/me/avatar/fallback', 'PUT', { color }),
 };
+
+async function uploadProfileMedia(file: File, kind: 'avatar' | 'banner'): Promise<UserProfile> {
+  const maxBytes = kind === 'avatar' ? 5 * 1024 * 1024 : 10 * 1024 * 1024;
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+    throw new Error('Only JPEG, PNG, and WebP images are accepted.');
+  }
+  if (file.size > maxBytes) {
+    throw new Error(kind === 'avatar' ? 'Avatar must be 5 MB or smaller.' : 'Banner must be 10 MB or smaller.');
+  }
+
+  const upload = await apiFetch<UploadUrlResponse>(`/api/profile/me/${kind}/upload-url`, 'POST', {
+    fileName: file.name,
+    contentType: file.type,
+    fileSizeBytes: file.size,
+  });
+
+  const put = await fetch(upload.uploadUrl, {
+    method: 'PUT',
+    headers: { 'Content-Type': upload.contentType },
+    body: file,
+  });
+  if (!put.ok) throw new Error('Upload failed.');
+
+  return apiFetch<UserProfile>(`/api/profile/me/${kind}/confirm`, 'POST', { objectKey: upload.objectKey });
+}
