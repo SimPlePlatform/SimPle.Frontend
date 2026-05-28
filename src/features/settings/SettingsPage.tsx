@@ -8,7 +8,7 @@ import { useToast } from '@/components/ui/Toast';
 import { accountApi, type Session } from '@/features/auth/accountApi';
 import { ApiError } from '@/lib/api-client';
 import { useAuth } from '@/features/auth/AuthProvider';
-import { profileApi, type UserProfile } from '@/features/profile/profileApi';
+import { profileApi, type UserProfile, type UsernameChangeRequest } from '@/features/profile/profileApi';
 
 const SECTIONS = [
   { id: 'account', label: 'Account',       icon: 'user' },
@@ -102,12 +102,18 @@ function AccountSettings() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [profileForm, setProfileForm] = useState({ displayName: '', bio: '' });
   const [profileSaving, setProfileSaving] = useState(false);
+  const [usernameRequest, setUsernameRequest] = useState<UsernameChangeRequest | null>(null);
+  const [showUsernameRequest, setShowUsernameRequest] = useState(false);
+  const [requestedUsername, setRequestedUsername] = useState('');
+  const [usernameRequestLoading, setUsernameRequestLoading] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
 
   useEffect(() => {
     profileApi.getMe().then(p => {
       setProfile(p);
       setProfileForm({ displayName: p.displayName, bio: p.bio ?? '' });
     }).catch(() => {/* non-fatal during initial load */});
+    profileApi.getUsernameChangeRequest().then(r => setUsernameRequest(r)).catch(() => {});
   }, []);
 
   // ── Change password ───────────────────────────────────────────────────────
@@ -187,6 +193,21 @@ function AccountSettings() {
     }
   };
 
+  const [revokeAllLoading, setRevokeAllLoading] = useState(false);
+  const handleRevokeAllSessions = async () => {
+    setRevokeAllLoading(true);
+    try {
+      await accountApi.revokeAllSessions();
+      setSessions([]);
+      toast.push({ kind: 'success', title: 'All other sessions signed out.' });
+      await logout();
+    } catch (e) {
+      toast.push({ kind: 'default', title: e instanceof ApiError ? e.message : 'Could not sign out all sessions.' });
+    } finally {
+      setRevokeAllLoading(false);
+    }
+  };
+
   // ── Delete account ────────────────────────────────────────────────────────
   const [showDelete, setShowDelete] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
@@ -211,15 +232,85 @@ function AccountSettings() {
         {profile ? (
           <>
             <div className="row" style={{ gap: 18 }}>
-              <Avatar user={{ initials: profile.initials, color: profile.color, status: 'online' }} size="xl" />
+              <div style={{ position: 'relative', cursor: 'pointer' }} title="Click to upload a new avatar">
+                <Avatar user={{ initials: profile.initials, color: profile.color, status: 'online' }} size="xl" />
+                <label style={{
+                  position: 'absolute', inset: 0, borderRadius: '50%',
+                  background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', cursor: 'pointer', opacity: avatarUploading ? 1 : 0,
+                  transition: 'opacity 0.15s',
+                }}
+                  onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                  onMouseLeave={e => !avatarUploading && (e.currentTarget.style.opacity = '0')}>
+                  <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden
+                    onChange={async e => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      setAvatarUploading(true);
+                      try {
+                        const updated = await profileApi.uploadAvatar(file);
+                        setProfile(updated);
+                        toast.push({ kind: 'success', title: 'Avatar updated.' });
+                      } catch (err) {
+                        toast.push({ kind: 'default', title: err instanceof Error ? err.message : 'Upload failed.' });
+                      } finally {
+                        setAvatarUploading(false);
+                        e.target.value = '';
+                      }
+                    }} />
+                  <Icon name={avatarUploading ? 'refresh' : 'edit'} size={16} style={{ color: '#fff' }} />
+                </label>
+              </div>
               <div className="col" style={{ flex: 1, gap: 10 }}>
                 <Field label="Display name">
                   <input className="input" value={profileForm.displayName}
                     onChange={e => setProfileForm(f => ({ ...f, displayName: e.target.value }))} />
                 </Field>
                 <Field label="Username (handle)">
-                  <input className="input" defaultValue={profile.username} disabled
-                    style={{ opacity: 0.6 }} title="Change username via profile page" />
+                  <div>
+                    <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+                      <span className="mono" style={{ fontSize: 13, color: 'var(--text-md)' }}>@{profile.username}</span>
+                      {!usernameRequest || usernameRequest.status === 'Rejected' ? (
+                        <Button size="sm" variant="ghost" style={{ fontSize: 11 }}
+                          onClick={() => setShowUsernameRequest(v => !v)}>
+                          Request change
+                        </Button>
+                      ) : (
+                        <span className="chip chip--mono" style={{ fontSize: 10 }}>
+                          {usernameRequest.status === 'Pending' ? '⏳ Pending review' : '✓ Change approved'}
+                        </span>
+                      )}
+                    </div>
+                    {usernameRequest?.status === 'Rejected' && (
+                      <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 4 }}>
+                        Previous request rejected{usernameRequest.rejectionReason ? `: ${usernameRequest.rejectionReason}` : ''}.
+                      </div>
+                    )}
+                    {showUsernameRequest && (
+                      <div className="row" style={{ gap: 6, marginTop: 8 }}>
+                        <input className="input" placeholder="New username"
+                          value={requestedUsername} onChange={e => setRequestedUsername(e.target.value)}
+                          style={{ flex: 1 }} />
+                        <Button size="sm" disabled={usernameRequestLoading || !requestedUsername} onClick={async () => {
+                          setUsernameRequestLoading(true);
+                          try {
+                            const req = await profileApi.requestUsernameChange(requestedUsername);
+                            setUsernameRequest(req);
+                            setShowUsernameRequest(false);
+                            setRequestedUsername('');
+                            toast.push({ kind: 'success', title: 'Request submitted', body: 'An admin will review your request.' });
+                          } catch (e) {
+                            toast.push({ kind: 'default', title: e instanceof ApiError ? e.message : 'Could not submit request.' });
+                          } finally {
+                            setUsernameRequestLoading(false);
+                          }
+                        }}>
+                          {usernameRequestLoading ? '…' : 'Submit'}
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setShowUsernameRequest(false)}>Cancel</Button>
+                      </div>
+                    )}
+                  </div>
                 </Field>
               </div>
             </div>
@@ -343,6 +434,14 @@ function AccountSettings() {
                 )}
               </div>
             ))}
+            {sessions.filter(s => !s.isCurrent).length > 0 && (
+              <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border-1)' }}>
+                <Button size="sm" variant="ghost" onClick={handleRevokeAllSessions} disabled={revokeAllLoading}
+                  style={{ color: 'var(--danger)', fontSize: 12 }}>
+                  {revokeAllLoading ? '…' : 'Sign out all other devices'}
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </SettingCard>

@@ -6,14 +6,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
-function mockOk(body: unknown) {
-  return Promise.resolve({
-    ok: true,
-    status: 200,
-    json: () => Promise.resolve(body),
-  });
-}
-
 function mockError(status: number, body: unknown) {
   return Promise.resolve({
     ok: false,
