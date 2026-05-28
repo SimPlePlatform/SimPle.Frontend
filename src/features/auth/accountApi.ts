@@ -22,6 +22,9 @@ export const accountApi = {
   revokeSession: (sessionId: string) =>
     apiFetch<void>(`/api/auth/sessions/${sessionId}`, 'DELETE'),
 
+  revokeAllSessions: () =>
+    apiFetch<void>('/api/auth/logout-all', 'POST'),
+
   deleteAccount: (password: string) =>
     apiFetch<void>('/api/auth/account', 'DELETE', { password }),
 };

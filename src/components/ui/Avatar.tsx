@@ -10,11 +10,12 @@ interface AvatarUser {
 
 interface AvatarProps {
   user?: AvatarUser;
+  src?: string | null;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   showPresence?: boolean;
 }
 
-export function Avatar({ user, size = 'md', showPresence = false }: AvatarProps) {
+export function Avatar({ user, src, size = 'md', showPresence = false }: AvatarProps) {
   const cls = [
     'avatar',
     size === 'sm' ? 'avatar--sm' : size === 'lg' ? 'avatar--lg' : size === 'xl' ? 'avatar--xl' : '',
@@ -24,8 +25,8 @@ export function Avatar({ user, size = 'md', showPresence = false }: AvatarProps)
   const grad = `radial-gradient(circle at 25% 20%, rgba(255,255,255,0.30), transparent 55%), linear-gradient(135deg, ${bg} 0%, ${shade(bg, -30)} 100%)`;
 
   return (
-    <span className={cls} style={{ background: grad }}>
-      {user?.initials ?? '??'}
+    <span className={cls} style={{ background: src ? `url(${src}) center/cover` : grad }}>
+      {!src && (user?.initials ?? '??')}
       {showPresence && user?.status && (
         <span
           className="avatar__presence"

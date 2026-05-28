@@ -1,14 +1,14 @@
 'use client';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
 import { Icon } from '@/components/ui/Icons';
 import { Toggle } from '@/components/ui/Toggle';
 import { useToast } from '@/components/ui/Toast';
-import { CURRENT_USER } from '@/mock/users';
 import { accountApi, type Session } from '@/features/auth/accountApi';
 import { ApiError } from '@/lib/api-client';
 import { useAuth } from '@/features/auth/AuthProvider';
+import { profileApi, type UserProfile, type UsernameChangeRequest } from '@/features/profile/profileApi';
 
 const SECTIONS = [
   { id: 'account', label: 'Account',       icon: 'user' },
@@ -97,7 +97,25 @@ function Field({ label, children, style }: { label: string; children: React.Reac
 function AccountSettings() {
   const toast = useToast();
   const { user, logout } = useAuth();
-  const u = CURRENT_USER; // still used for avatar/profile card (Module 2 will wire this)
+
+  // ── Profile card (Module 2) ───────────────────────────────────────────────
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profileForm, setProfileForm] = useState({ displayName: '', bio: '' });
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [usernameRequest, setUsernameRequest] = useState<UsernameChangeRequest | null>(null);
+  const [showUsernameRequest, setShowUsernameRequest] = useState(false);
+  const [requestedUsername, setRequestedUsername] = useState('');
+  const [usernameRequestLoading, setUsernameRequestLoading] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [bannerUploading, setBannerUploading] = useState(false);
+
+  useEffect(() => {
+    profileApi.getMe().then(p => {
+      setProfile(p);
+      setProfileForm({ displayName: p.displayName, bio: p.bio ?? '' });
+    }).catch(() => {/* non-fatal during initial load */});
+    profileApi.getUsernameChangeRequest().then(r => setUsernameRequest(r)).catch(() => {});
+  }, []);
 
   // ── Change password ───────────────────────────────────────────────────────
   const [showChangePw, setShowChangePw] = useState(false);
@@ -176,6 +194,21 @@ function AccountSettings() {
     }
   };
 
+  const [revokeAllLoading, setRevokeAllLoading] = useState(false);
+  const handleRevokeAllSessions = async () => {
+    setRevokeAllLoading(true);
+    try {
+      await accountApi.revokeAllSessions();
+      setSessions([]);
+      toast.push({ kind: 'success', title: 'All other sessions signed out.' });
+      await logout();
+    } catch (e) {
+      toast.push({ kind: 'default', title: e instanceof ApiError ? e.message : 'Could not sign out all sessions.' });
+    } finally {
+      setRevokeAllLoading(false);
+    }
+  };
+
   // ── Delete account ────────────────────────────────────────────────────────
   const [showDelete, setShowDelete] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
@@ -196,22 +229,202 @@ function AccountSettings() {
 
   return (
     <>
-      {/* Profile card — wired to real API in Module 2 */}
       <SettingCard title="Profile" sub="Public info shown to other players.">
-        <div className="row" style={{ gap: 18 }}>
-          <Avatar user={u} size="xl" />
-          <div className="col" style={{ flex: 1, gap: 10 }}>
-            <Field label="Display name"><input className="input" defaultValue={u.display} /></Field>
-            <Field label="Username (handle)"><input className="input" defaultValue={u.username} /></Field>
-          </div>
-        </div>
-        <Field label="Bio" style={{ marginTop: 12 }}>
-          <textarea className="input" defaultValue={u.bio} style={{ minHeight: 80, padding: 12, width: '100%' }} />
-        </Field>
-        <div className="row" style={{ marginTop: 14, justifyContent: 'flex-end', gap: 8 }}>
-          <Button variant="ghost">Cancel</Button>
-          <Button onClick={() => toast.push({ kind: 'success', title: 'Profile saved', body: 'Your changes are live.' })}>Save changes</Button>
-        </div>
+        {profile ? (
+          <>
+            <div className="row" style={{ gap: 18 }}>
+              <div style={{ position: 'relative', cursor: 'pointer' }} title="Click to upload a new avatar">
+                <Avatar user={{ initials: profile.initials, color: profile.color, status: 'online' }} src={profile.avatarUrl} size="xl" />
+                <label style={{
+                  position: 'absolute', inset: 0, borderRadius: '50%',
+                  background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', cursor: 'pointer', opacity: avatarUploading ? 1 : 0,
+                  transition: 'opacity 0.15s',
+                }}
+                  onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                  onMouseLeave={e => !avatarUploading && (e.currentTarget.style.opacity = '0')}>
+                  <input type="file" accept="image/jpeg,image/png,image/webp" hidden
+                    onChange={async e => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      setAvatarUploading(true);
+                      try {
+                        const updated = await profileApi.uploadAvatar(file);
+                        setProfile(updated);
+                        toast.push({ kind: 'success', title: 'Avatar updated.' });
+                      } catch (err) {
+                        toast.push({ kind: 'default', title: err instanceof Error ? err.message : 'Upload failed.' });
+                      } finally {
+                        setAvatarUploading(false);
+                        e.target.value = '';
+                      }
+                    }} />
+                  <Icon name={avatarUploading ? 'refresh' : 'edit'} size={16} style={{ color: '#fff' }} />
+                </label>
+              </div>
+              <div className="col" style={{ flex: 1, gap: 10 }}>
+                <div style={{
+                  minHeight: 72, borderRadius: 8, border: '1px solid var(--border-1)',
+                  background: profile.bannerUrl ? `url(${profile.bannerUrl}) center/cover` : 'linear-gradient(135deg, #0F1422 0%, #1B2238 50%, #0B0F18 100%)',
+                  position: 'relative', overflow: 'hidden'
+                }}>
+                  <label style={{ position: 'absolute', top: 8, right: 8 }}>
+                    <input type="file" accept="image/jpeg,image/png,image/webp" hidden
+                      onChange={async e => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setBannerUploading(true);
+                        try {
+                          const updated = await profileApi.uploadBanner(file);
+                          setProfile(updated);
+                          toast.push({ kind: 'success', title: 'Cover updated.' });
+                        } catch (err) {
+                          toast.push({ kind: 'default', title: err instanceof Error ? err.message : 'Upload failed.' });
+                        } finally {
+                          setBannerUploading(false);
+                          e.target.value = '';
+                        }
+                      }} />
+                    <Button size="sm" variant="ghost" icon={bannerUploading ? 'refresh' : 'more'}>
+                      {profile.hasUploadedBanner ? 'Change cover' : 'Upload cover'}
+                    </Button>
+                  </label>
+                  {profile.hasUploadedBanner && (
+                    <div style={{ position: 'absolute', right: 8, bottom: 8 }}>
+                      <Button size="sm" variant="ghost" icon="trash" onClick={async () => {
+                        setBannerUploading(true);
+                        try {
+                          const updated = await profileApi.removeBanner();
+                          setProfile(updated);
+                          toast.push({ kind: 'success', title: 'Cover removed.' });
+                        } catch (e) {
+                          toast.push({ kind: 'default', title: e instanceof ApiError ? e.message : 'Could not remove cover.' });
+                        } finally {
+                          setBannerUploading(false);
+                        }
+                      }}>
+                        Remove
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                <Field label="Display name">
+                  <input className="input" value={profileForm.displayName}
+                    onChange={e => setProfileForm(f => ({ ...f, displayName: e.target.value }))} />
+                </Field>
+                <Field label="Username (handle)">
+                  <div>
+                    <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+                      <span className="mono" style={{ fontSize: 13, color: 'var(--text-md)' }}>@{profile.username}</span>
+                      {!usernameRequest || usernameRequest.status === 'Rejected' ? (
+                        <Button size="sm" variant="ghost" style={{ fontSize: 11 }}
+                          onClick={() => setShowUsernameRequest(v => !v)}>
+                          Request change
+                        </Button>
+                      ) : (
+                        <span className="chip chip--mono" style={{ fontSize: 10 }}>
+                          {usernameRequest.status === 'Pending' ? '⏳ Pending review' : '✓ Change approved'}
+                        </span>
+                      )}
+                    </div>
+                    {usernameRequest?.status === 'Rejected' && (
+                      <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 4 }}>
+                        Previous request rejected{usernameRequest.rejectionReason ? `: ${usernameRequest.rejectionReason}` : ''}.
+                      </div>
+                    )}
+                    {showUsernameRequest && (
+                      <div className="row" style={{ gap: 6, marginTop: 8 }}>
+                        <input className="input" placeholder="New username"
+                          value={requestedUsername} onChange={e => setRequestedUsername(e.target.value)}
+                          style={{ flex: 1 }} />
+                        <Button size="sm" disabled={usernameRequestLoading || !requestedUsername} onClick={async () => {
+                          setUsernameRequestLoading(true);
+                          try {
+                            const req = await profileApi.requestUsernameChange(requestedUsername);
+                            setUsernameRequest(req);
+                            setShowUsernameRequest(false);
+                            setRequestedUsername('');
+                            toast.push({ kind: 'success', title: 'Request submitted', body: 'An admin will review your request.' });
+                          } catch (e) {
+                            toast.push({ kind: 'default', title: e instanceof ApiError ? e.message : 'Could not submit request.' });
+                          } finally {
+                            setUsernameRequestLoading(false);
+                          }
+                        }}>
+                          {usernameRequestLoading ? '…' : 'Submit'}
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setShowUsernameRequest(false)}>Cancel</Button>
+                      </div>
+                    )}
+                  </div>
+                </Field>
+              </div>
+            </div>
+            <Field label="Bio" style={{ marginTop: 12 }}>
+              <textarea className="input" value={profileForm.bio}
+                onChange={e => setProfileForm(f => ({ ...f, bio: e.target.value }))}
+                style={{ minHeight: 80, padding: 12, width: '100%' }} />
+            </Field>
+            <Field label="Profile visibility" style={{ marginTop: 12 }}>
+              <select className="input" value={profile.visibility} onChange={async e => {
+                const visibility = e.target.value as UserProfile['visibility'];
+                try {
+                  const updated = await profileApi.updateMe({
+                    displayName: profile.displayName,
+                    bio: profile.bio,
+                    avatarUrl: profile.avatarUrl,
+                    bannerUrl: profile.bannerUrl,
+                    region: profile.region,
+                    statusMessage: profile.statusMessage,
+                    visibility,
+                  });
+                  setProfile(updated);
+                  toast.push({ kind: 'success', title: 'Visibility updated.' });
+                } catch (err) {
+                  toast.push({ kind: 'default', title: err instanceof ApiError ? err.message : 'Could not update visibility.' });
+                }
+              }}>
+                <option value="Public">Public</option>
+                <option value="FriendsOnly">Friends-only</option>
+                <option value="Private">Private</option>
+              </select>
+              {profile.visibility === 'FriendsOnly' && (
+                <div style={{ fontSize: 12, color: 'var(--text-lo)', marginTop: 6 }}>
+                  Friends-only visibility is saved now. Until the friends module is implemented, it behaves like private.
+                </div>
+              )}
+            </Field>
+            <div className="row" style={{ marginTop: 14, justifyContent: 'flex-end', gap: 8 }}>
+              <Button variant="ghost" onClick={() => setProfileForm({ displayName: profile.displayName, bio: profile.bio ?? '' })}>
+                Cancel
+              </Button>
+              <Button disabled={profileSaving} onClick={async () => {
+                setProfileSaving(true);
+                try {
+                  const updated = await profileApi.updateMe({
+                    displayName: profileForm.displayName,
+                    bio: profileForm.bio || null,
+                    avatarUrl: profile.avatarUrl,
+                    bannerUrl: profile.bannerUrl,
+                    region: profile.region,
+                    statusMessage: profile.statusMessage,
+                    visibility: profile.visibility,
+                  });
+                  setProfile(updated);
+                  toast.push({ kind: 'success', title: 'Profile saved.', body: 'Your changes are live.' });
+                } catch (e) {
+                  toast.push({ kind: 'default', title: e instanceof ApiError ? e.message : 'Could not save profile.' });
+                } finally {
+                  setProfileSaving(false);
+                }
+              }}>
+                {profileSaving ? '…' : 'Save changes'}
+              </Button>
+            </div>
+          </>
+        ) : (
+          <div style={{ fontSize: 13, color: 'var(--text-lo)', padding: '8px 0' }}>Loading…</div>
+        )}
       </SettingCard>
 
       <SettingCard title="Login & security">
@@ -296,6 +509,14 @@ function AccountSettings() {
                 )}
               </div>
             ))}
+            {sessions.filter(s => !s.isCurrent).length > 0 && (
+              <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border-1)' }}>
+                <Button size="sm" variant="ghost" onClick={handleRevokeAllSessions} disabled={revokeAllLoading}
+                  style={{ color: 'var(--danger)', fontSize: 12 }}>
+                  {revokeAllLoading ? '…' : 'Sign out all other devices'}
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </SettingCard>
@@ -413,17 +634,46 @@ function NotifySettings() {
 }
 
 function PrivacySettings() {
-  const [visibility, setVisibility] = useState('Friends');
+  const toast = useToast();
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [onlineStatus, setOnlineStatus] = useState(true);
+  useEffect(() => {
+    profileApi.getMe().then(setProfile).catch(() => {});
+  }, []);
+
+  const setVisibility = async (visibility: UserProfile['visibility']) => {
+    if (!profile) return;
+    try {
+      const updated = await profileApi.updateMe({
+        displayName: profile.displayName,
+        bio: profile.bio,
+        avatarUrl: profile.avatarUrl,
+        bannerUrl: profile.bannerUrl,
+        region: profile.region,
+        statusMessage: profile.statusMessage,
+        visibility,
+      });
+      setProfile(updated);
+      toast.push({ kind: 'success', title: 'Visibility updated.' });
+    } catch (e) {
+      toast.push({ kind: 'default', title: e instanceof ApiError ? e.message : 'Could not update visibility.' });
+    }
+  };
+
   return (
     <SettingCard title="Privacy" sub="Control who sees you and what they see.">
       <SettingRow label="Profile visibility" right={
         <div className="tabs">
-          {['Public', 'Friends', 'Private'].map(d => (
-            <button key={d} className={`tab ${d === visibility ? 'tab--active' : ''}`} onClick={() => setVisibility(d)}>{d}</button>
-          ))}
+          <button className={`tab ${profile?.visibility === 'Public' ? 'tab--active' : ''}`} onClick={() => void setVisibility('Public')}>Public</button>
+          <button className={`tab ${profile?.visibility === 'FriendsOnly' ? 'tab--active' : ''}`} onClick={() => void setVisibility('FriendsOnly')}>Friends-only</button>
+          <button className={`tab ${profile?.visibility === 'Private' ? 'tab--active' : ''}`} onClick={() => void setVisibility('Private')}>Private</button>
         </div>
       } />
+      {profile?.visibility === 'FriendsOnly' && (
+        <div style={{ fontSize: 12, color: 'var(--text-lo)', padding: '0 0 10px' }}>
+          Friends-only visibility is saved now. Until the friends module is implemented, it behaves like private.
+        </div>
+      )}
       <SettingRow label="Show online status" hint="Friends always see you online" right={<Toggle on={onlineStatus} onChange={setOnlineStatus} label="" />} />
       <SettingRow label="Allow friend requests from" right={
         <div className="tabs">
