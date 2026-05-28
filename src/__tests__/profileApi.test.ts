@@ -28,11 +28,12 @@ const SAMPLE_PROFILE = {
   hasUploadedAvatar: false,
   hasUploadedBanner: false,
   statusMessage: null,
-  region: 'EU-West',
+  region: '',
   color: '#F0394B',
+  bannerFallbackColor: '#0F1422',
   initials: 'TU',
   visibility: 'Public',
-  profileType: 'Gamer',
+  profileType: 'Player',
   role: 'Player',
   level: 1,
   elo: 1200,
@@ -228,5 +229,59 @@ describe('profileApi', () => {
       expect.objectContaining({ method: 'PUT', body: expect.stringContaining('#3366AA') }),
     );
     expect(result.color).toBe('#3366AA');
+  });
+
+  it('updateBannerFallback calls fallback endpoint', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200, json: () => Promise.resolve({ ...SAMPLE_PROFILE, bannerFallbackColor: '#123456' }) });
+    const { profileApi } = await import('@/features/profile/profileApi');
+    const result = await profileApi.updateBannerFallback('#123456');
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/profile/me/banner/fallback'),
+      expect.objectContaining({ method: 'PUT', body: expect.stringContaining('#123456') }),
+    );
+    expect(result.bannerFallbackColor).toBe('#123456');
+  });
+
+  it('updateUsername returns immediate or request result', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ appliedImmediately: true, message: 'Username changed.', request: null }),
+    });
+    const { profileApi } = await import('@/features/profile/profileApi');
+    const result = await profileApi.updateUsername('newhandle');
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/profile/me/username'),
+      expect.objectContaining({ method: 'PUT', body: expect.stringContaining('newhandle') }),
+    );
+    expect(result.appliedImmediately).toBe(true);
+  });
+
+  it('cancelUsernameChangeRequest calls DELETE endpoint', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({
+        id: 'r-1',
+        requestedUsername: 'nextname',
+        status: 'Cancelled',
+        rejectionReason: null,
+        requestYear: 2026,
+        requestMonth: 5,
+        createdAt: '2026-05-01T00:00:00Z',
+        updatedAt: '2026-05-01T00:00:00Z',
+        cancelledAt: '2026-05-01T00:01:00Z',
+        reviewedAt: null,
+        canEdit: false,
+        canCancel: false,
+      }),
+    });
+    const { profileApi } = await import('@/features/profile/profileApi');
+    const result = await profileApi.cancelUsernameChangeRequest();
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/profile/me/username-change-request'),
+      expect.objectContaining({ method: 'DELETE' }),
+    );
+    expect(result.status).toBe('Cancelled');
   });
 });
