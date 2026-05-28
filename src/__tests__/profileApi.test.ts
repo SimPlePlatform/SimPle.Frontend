@@ -177,6 +177,37 @@ describe('profileApi', () => {
     expect(result.hasUploadedBanner).toBe(true);
   });
 
+  it('removeBanner calls DELETE /api/profile/me/banner', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200, json: () => Promise.resolve(SAMPLE_PROFILE) });
+    const { profileApi } = await import('@/features/profile/profileApi');
+    await profileApi.removeBanner();
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/profile/me/banner'),
+      expect.objectContaining({ method: 'DELETE' }),
+    );
+  });
+
+  it('uploadAvatar stops before confirm when direct upload fails', async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          uploadUrl: 'https://s3-upload.test/avatar',
+          objectKey: 'profile-assets/users/u-1/avatar/file.png',
+          contentType: 'image/png',
+          expiresAtUtc: '2026-01-01T00:10:00Z',
+        }),
+      })
+      .mockResolvedValueOnce({ ok: false, status: 403, json: () => Promise.resolve({}) });
+
+    const { profileApi } = await import('@/features/profile/profileApi');
+    const file = new File(['avatar'], 'avatar.png', { type: 'image/png' });
+
+    await expect(profileApi.uploadAvatar(file)).rejects.toThrow('Upload failed.');
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
   it('updateAvatarFallback calls fallback endpoint', async () => {
     mockFetch.mockResolvedValueOnce({ ok: true, status: 200, json: () => Promise.resolve({ ...SAMPLE_PROFILE, color: '#3366AA' }) });
     const { profileApi } = await import('@/features/profile/profileApi');
