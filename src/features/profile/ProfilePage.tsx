@@ -77,8 +77,6 @@ export function ProfilePage({ userId }: { userId: string }) {
       const updated = await profileApi.updateMe({
         displayName: editForm.displayName,
         bio: editForm.bio || null,
-        avatarUrl: profile.avatarUrl,
-        bannerUrl: profile.bannerUrl,
         region: profile.region,
         statusMessage: profile.statusMessage,
         visibility: profile.visibility,

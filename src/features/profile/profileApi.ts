@@ -42,11 +42,11 @@ interface UploadUrlResponse {
   expiresAtUtc: string;
 }
 
+// avatarUrl and bannerUrl are intentionally omitted.
+// Profile media is managed exclusively through the upload/confirm/remove endpoints.
 export interface UpdateProfileRequest {
   displayName: string;
   bio?: string | null;
-  avatarUrl?: string | null;
-  bannerUrl?: string | null;
   region?: string | null;
   statusMessage?: string | null;
   visibility?: ProfileVisibility;

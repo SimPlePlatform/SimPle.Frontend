@@ -285,3 +285,55 @@ describe('profileApi', () => {
     expect(result.status).toBe('Cancelled');
   });
 });
+
+describe('UpdateProfileRequest security contract', () => {
+  it('does not include avatarUrl or bannerUrl fields', () => {
+    // These fields were removed from UpdateProfileRequest to prevent bypassing
+    // the presigned upload flow with arbitrary external URLs.
+    const request = {
+      displayName: 'Test',
+      bio: null,
+      region: null,
+      statusMessage: null,
+      visibility: 'Public' as const,
+      profileType: 'Player' as const,
+    };
+    expect(Object.keys(request)).not.toContain('avatarUrl');
+    expect(Object.keys(request)).not.toContain('bannerUrl');
+  });
+
+  it('updateMe does not send avatarUrl or bannerUrl to the API', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200, json: () => Promise.resolve(SAMPLE_PROFILE) });
+    const { profileApi } = await import('@/features/profile/profileApi');
+    await profileApi.updateMe({ displayName: 'Test', visibility: 'Public' });
+    const body = String(mockFetch.mock.calls[0][1].body);
+    expect(body).not.toContain('avatarUrl');
+    expect(body).not.toContain('bannerUrl');
+  });
+});
+
+describe('profileApi upload security', () => {
+  it('uploadAvatar rejects non-image types before hitting the API', async () => {
+    const { profileApi } = await import('@/features/profile/profileApi');
+    const file = new File(['data'], 'file.svg', { type: 'image/svg+xml' });
+    await expect(profileApi.uploadAvatar(file)).rejects.toThrow();
+    // fetch should not have been called — rejection happens client-side
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('uploadAvatar rejects files over 5 MB', async () => {
+    const { profileApi } = await import('@/features/profile/profileApi');
+    const largeContent = new Uint8Array(5 * 1024 * 1024 + 1);
+    const file = new File([largeContent], 'big.png', { type: 'image/png' });
+    await expect(profileApi.uploadAvatar(file)).rejects.toThrow('5 MB');
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('uploadBanner rejects files over 10 MB', async () => {
+    const { profileApi } = await import('@/features/profile/profileApi');
+    const largeContent = new Uint8Array(10 * 1024 * 1024 + 1);
+    const file = new File([largeContent], 'big.webp', { type: 'image/webp' });
+    await expect(profileApi.uploadBanner(file)).rejects.toThrow('10 MB');
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+});

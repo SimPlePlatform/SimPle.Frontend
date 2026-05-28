@@ -707,8 +707,6 @@ function AccountSettings() {
                   const updated = await profileApi.updateMe({
                     displayName: profileForm.displayName,
                     bio: profileForm.bio || null,
-                    avatarUrl: profile.avatarUrl,
-                    bannerUrl: profile.bannerUrl,
                     region: profile.region,
                     statusMessage: profile.statusMessage,
                     visibility: profileForm.visibility,
@@ -921,8 +919,6 @@ function PrivacySettings() {
       const updated = await profileApi.updateMe({
         displayName: profile.displayName,
         bio: profile.bio,
-        avatarUrl: profile.avatarUrl,
-        bannerUrl: profile.bannerUrl,
         region: profile.region,
         statusMessage: profile.statusMessage,
         visibility,
