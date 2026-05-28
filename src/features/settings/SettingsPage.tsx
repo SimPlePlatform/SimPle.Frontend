@@ -10,6 +10,14 @@ import { ApiError } from '@/lib/api-client';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { profileApi, type UserProfile, type UsernameChangeRequest } from '@/features/profile/profileApi';
 
+const LINK_PLATFORMS = [
+  { value: 'github', label: 'GitHub' },
+  { value: 'xtwitter', label: 'X/Twitter' },
+  { value: 'instagram', label: 'Instagram' },
+  { value: 'website', label: 'Website' },
+  { value: 'discord', label: 'Discord' },
+] as const;
+
 const SECTIONS = [
   { id: 'account', label: 'Account',       icon: 'user' },
   { id: 'theme',   label: 'Theme',          icon: 'sparkle' },
@@ -101,7 +109,9 @@ function AccountSettings() {
   // ── Profile card (Module 2) ───────────────────────────────────────────────
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [profileForm, setProfileForm] = useState({ displayName: '', bio: '' });
+  const [linkForm, setLinkForm] = useState<UserProfile['links']>([]);
   const [profileSaving, setProfileSaving] = useState(false);
+  const [linksSaving, setLinksSaving] = useState(false);
   const [usernameRequest, setUsernameRequest] = useState<UsernameChangeRequest | null>(null);
   const [showUsernameRequest, setShowUsernameRequest] = useState(false);
   const [requestedUsername, setRequestedUsername] = useState('');
@@ -113,6 +123,7 @@ function AccountSettings() {
     profileApi.getMe().then(p => {
       setProfile(p);
       setProfileForm({ displayName: p.displayName, bio: p.bio ?? '' });
+      setLinkForm(p.links);
     }).catch(() => {/* non-fatal during initial load */});
     profileApi.getUsernameChangeRequest().then(r => setUsernameRequest(r)).catch(() => {});
   }, []);
@@ -377,6 +388,7 @@ function AccountSettings() {
                     region: profile.region,
                     statusMessage: profile.statusMessage,
                     visibility,
+                    profileType: profile.profileType,
                   });
                   setProfile(updated);
                   toast.push({ kind: 'success', title: 'Visibility updated.' });
@@ -394,8 +406,114 @@ function AccountSettings() {
                 </div>
               )}
             </Field>
+            <Field label="Profile type" style={{ marginTop: 12 }}>
+              <select className="input" value={profile.profileType} onChange={async e => {
+                const profileType = e.target.value as UserProfile['profileType'];
+                try {
+                  const updated = await profileApi.updateMe({
+                    displayName: profile.displayName,
+                    bio: profile.bio,
+                    avatarUrl: profile.avatarUrl,
+                    bannerUrl: profile.bannerUrl,
+                    region: profile.region,
+                    statusMessage: profile.statusMessage,
+                    visibility: profile.visibility,
+                    profileType,
+                  });
+                  setProfile(updated);
+                  toast.push({ kind: 'success', title: 'Profile type updated.' });
+                } catch (err) {
+                  toast.push({ kind: 'default', title: err instanceof ApiError ? err.message : 'Could not update profile type.' });
+                }
+              }}>
+                <option value="Gamer">Gamer</option>
+                <option value="Developer">Developer</option>
+              </select>
+              <div style={{ fontSize: 12, color: 'var(--text-lo)', marginTop: 6 }}>
+                Developer marks your profile as a game publisher/developer profile. Publishing tools are planned for later modules.
+              </div>
+            </Field>
+            <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border-1)' }}>
+              <div className="row between" style={{ marginBottom: 8 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 600 }}>Web profiles</div>
+                <Button size="sm" variant="ghost" onClick={() => {
+                  if (linkForm.length >= 5) {
+                    toast.push({ kind: 'default', title: 'Maximum 5 links allowed.' });
+                    return;
+                  }
+                  setLinkForm(links => [...links, { id: `new-${Date.now()}`, platform: 'github', url: '', displayLabel: null, sortOrder: links.length }]);
+                }}>
+                  Add link
+                </Button>
+              </div>
+              <div className="col" style={{ gap: 8 }}>
+                {linkForm.map((link, index) => (
+                  <div key={link.id} className="row" style={{ gap: 8, alignItems: 'center' }}>
+                    <select className="input" aria-label="Link platform" value={link.platform}
+                      onChange={e => setLinkForm(links => links.map((l, i) => i === index ? { ...l, platform: e.target.value } : l))}
+                      style={{ width: 130 }}>
+                      {LINK_PLATFORMS.map(platform => (
+                        <option key={platform.value} value={platform.value}>{platform.label}</option>
+                      ))}
+                    </select>
+                    <input className="input" aria-label="Link URL" placeholder="https://example.com"
+                      value={link.url}
+                      onChange={e => setLinkForm(links => links.map((l, i) => i === index ? { ...l, url: e.target.value } : l))}
+                      style={{ flex: 1 }} />
+                    <input className="input" aria-label="Link label" placeholder="Label"
+                      value={link.displayLabel ?? ''}
+                      onChange={e => setLinkForm(links => links.map((l, i) => i === index ? { ...l, displayLabel: e.target.value || null } : l))}
+                      style={{ width: 140 }} />
+                    <Button size="sm" variant="ghost" icon="trash" onClick={() => setLinkForm(links => links.filter((_, i) => i !== index))}>
+                      Remove
+                    </Button>
+                  </div>
+                ))}
+                {linkForm.length === 0 && (
+                  <div style={{ fontSize: 12, color: 'var(--text-lo)' }}>No web profiles linked.</div>
+                )}
+              </div>
+              <div className="row" style={{ marginTop: 10, justifyContent: 'flex-end' }}>
+                <Button size="sm" disabled={linksSaving} onClick={async () => {
+                  const invalid = linkForm.some(link => {
+                    try {
+                      return new URL(link.url).protocol !== 'https:';
+                    } catch {
+                      return true;
+                    }
+                  });
+                  if (invalid) {
+                    toast.push({ kind: 'default', title: 'Links must be valid HTTPS URLs.' });
+                    return;
+                  }
+                  setLinksSaving(true);
+                  try {
+                    const updatedLinks = await profileApi.updateLinks({
+                      links: linkForm.map((link, index) => ({
+                        platform: link.platform,
+                        url: link.url,
+                        displayLabel: link.displayLabel,
+                        sortOrder: index,
+                      })),
+                    });
+                    setLinkForm(updatedLinks);
+                    setProfile({ ...profile, links: updatedLinks });
+                    toast.push({ kind: 'success', title: 'Web profiles updated.' });
+                  } catch (e) {
+                    toast.push({ kind: 'default', title: e instanceof ApiError ? e.message : 'Could not update web profiles.' });
+                  } finally {
+                    setLinksSaving(false);
+                  }
+                }}>
+                  {linksSaving ? '...' : 'Save web profiles'}
+                </Button>
+              </div>
+            </div>
             <div className="row" style={{ marginTop: 14, justifyContent: 'flex-end', gap: 8 }}>
-              <Button variant="ghost" onClick={() => setProfileForm({ displayName: profile.displayName, bio: profile.bio ?? '' })}>
+              <Button variant="ghost" onClick={() => {
+                setProfileForm({ displayName: profile.displayName, bio: profile.bio ?? '' });
+                setLinkForm(profile.links);
+              }}>
                 Cancel
               </Button>
               <Button disabled={profileSaving} onClick={async () => {
@@ -409,6 +527,7 @@ function AccountSettings() {
                     region: profile.region,
                     statusMessage: profile.statusMessage,
                     visibility: profile.visibility,
+                    profileType: profile.profileType,
                   });
                   setProfile(updated);
                   toast.push({ kind: 'success', title: 'Profile saved.', body: 'Your changes are live.' });
@@ -652,6 +771,7 @@ function PrivacySettings() {
         region: profile.region,
         statusMessage: profile.statusMessage,
         visibility,
+        profileType: profile.profileType,
       });
       setProfile(updated);
       toast.push({ kind: 'success', title: 'Visibility updated.' });

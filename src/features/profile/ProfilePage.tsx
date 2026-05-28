@@ -57,6 +57,7 @@ export function ProfilePage({ userId }: { userId: string }) {
         region: profile.region,
         statusMessage: profile.statusMessage,
         visibility: profile.visibility,
+        profileType: profile.profileType,
       });
       setProfile(updated);
       setEditing(false);
@@ -265,6 +266,7 @@ export function ProfilePage({ userId }: { userId: string }) {
             <div className="row" style={{ gap: 8 }}>
               <span className="chip chip--mono">{profile.elo} ELO</span>
               <span className="chip chip--mono">Lv {profile.level}</span>
+              <span className="chip chip--mono">{profile.profileType}</span>
               <span className="chip chip--mono" style={{ textTransform: 'capitalize' }}>{profile.role}</span>
             </div>
           </div>
