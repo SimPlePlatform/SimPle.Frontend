@@ -1,14 +1,14 @@
 'use client';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
 import { Icon } from '@/components/ui/Icons';
 import { Toggle } from '@/components/ui/Toggle';
 import { useToast } from '@/components/ui/Toast';
-import { CURRENT_USER } from '@/mock/users';
 import { accountApi, type Session } from '@/features/auth/accountApi';
 import { ApiError } from '@/lib/api-client';
 import { useAuth } from '@/features/auth/AuthProvider';
+import { profileApi, type UserProfile } from '@/features/profile/profileApi';
 
 const SECTIONS = [
   { id: 'account', label: 'Account',       icon: 'user' },
@@ -97,7 +97,18 @@ function Field({ label, children, style }: { label: string; children: React.Reac
 function AccountSettings() {
   const toast = useToast();
   const { user, logout } = useAuth();
-  const u = CURRENT_USER; // still used for avatar/profile card (Module 2 will wire this)
+
+  // ── Profile card (Module 2) ───────────────────────────────────────────────
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profileForm, setProfileForm] = useState({ displayName: '', bio: '' });
+  const [profileSaving, setProfileSaving] = useState(false);
+
+  useEffect(() => {
+    profileApi.getMe().then(p => {
+      setProfile(p);
+      setProfileForm({ displayName: p.displayName, bio: p.bio ?? '' });
+    }).catch(() => {/* non-fatal during initial load */});
+  }, []);
 
   // ── Change password ───────────────────────────────────────────────────────
   const [showChangePw, setShowChangePw] = useState(false);
@@ -196,22 +207,58 @@ function AccountSettings() {
 
   return (
     <>
-      {/* Profile card — wired to real API in Module 2 */}
       <SettingCard title="Profile" sub="Public info shown to other players.">
-        <div className="row" style={{ gap: 18 }}>
-          <Avatar user={u} size="xl" />
-          <div className="col" style={{ flex: 1, gap: 10 }}>
-            <Field label="Display name"><input className="input" defaultValue={u.display} /></Field>
-            <Field label="Username (handle)"><input className="input" defaultValue={u.username} /></Field>
-          </div>
-        </div>
-        <Field label="Bio" style={{ marginTop: 12 }}>
-          <textarea className="input" defaultValue={u.bio} style={{ minHeight: 80, padding: 12, width: '100%' }} />
-        </Field>
-        <div className="row" style={{ marginTop: 14, justifyContent: 'flex-end', gap: 8 }}>
-          <Button variant="ghost">Cancel</Button>
-          <Button onClick={() => toast.push({ kind: 'success', title: 'Profile saved', body: 'Your changes are live.' })}>Save changes</Button>
-        </div>
+        {profile ? (
+          <>
+            <div className="row" style={{ gap: 18 }}>
+              <Avatar user={{ initials: profile.initials, color: profile.color, status: 'online' }} size="xl" />
+              <div className="col" style={{ flex: 1, gap: 10 }}>
+                <Field label="Display name">
+                  <input className="input" value={profileForm.displayName}
+                    onChange={e => setProfileForm(f => ({ ...f, displayName: e.target.value }))} />
+                </Field>
+                <Field label="Username (handle)">
+                  <input className="input" defaultValue={profile.username} disabled
+                    style={{ opacity: 0.6 }} title="Change username via profile page" />
+                </Field>
+              </div>
+            </div>
+            <Field label="Bio" style={{ marginTop: 12 }}>
+              <textarea className="input" value={profileForm.bio}
+                onChange={e => setProfileForm(f => ({ ...f, bio: e.target.value }))}
+                style={{ minHeight: 80, padding: 12, width: '100%' }} />
+            </Field>
+            <div className="row" style={{ marginTop: 14, justifyContent: 'flex-end', gap: 8 }}>
+              <Button variant="ghost" onClick={() => setProfileForm({ displayName: profile.displayName, bio: profile.bio ?? '' })}>
+                Cancel
+              </Button>
+              <Button disabled={profileSaving} onClick={async () => {
+                setProfileSaving(true);
+                try {
+                  const updated = await profileApi.updateMe({
+                    displayName: profileForm.displayName,
+                    bio: profileForm.bio || null,
+                    avatarUrl: profile.avatarUrl,
+                    bannerUrl: profile.bannerUrl,
+                    region: profile.region,
+                    statusMessage: profile.statusMessage,
+                    visibility: profile.visibility,
+                  });
+                  setProfile(updated);
+                  toast.push({ kind: 'success', title: 'Profile saved.', body: 'Your changes are live.' });
+                } catch (e) {
+                  toast.push({ kind: 'default', title: e instanceof ApiError ? e.message : 'Could not save profile.' });
+                } finally {
+                  setProfileSaving(false);
+                }
+              }}>
+                {profileSaving ? '…' : 'Save changes'}
+              </Button>
+            </div>
+          </>
+        ) : (
+          <div style={{ fontSize: 13, color: 'var(--text-lo)', padding: '8px 0' }}>Loading…</div>
+        )}
       </SettingCard>
 
       <SettingCard title="Login & security">

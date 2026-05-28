@@ -1,70 +1,173 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
 import { Icon } from '@/components/ui/Icons';
 import { StatCard } from '@/components/ui/StatCard';
 import { GameArt } from '@/components/ui/GameArt';
 import { Tabs } from '@/components/ui/Tabs';
-import { CURRENT_USER } from '@/mock/users';
+import { useToast } from '@/components/ui/Toast';
 import { GAMES } from '@/mock/games';
 import { RECENT_MATCHES } from '@/mock/matches';
 import { ACHIEVEMENTS } from '@/mock/achievements';
 import { rarityBg, rarityFg } from '@/lib/utils';
+import { profileApi, type UserProfile } from '@/features/profile/profileApi';
+import { useAuth } from '@/features/auth/AuthProvider';
+import { ApiError } from '@/lib/api-client';
 
-export function ProfilePage({ userId: _userId }: { userId: string }) {
+export function ProfilePage({ userId }: { userId: string }) {
+  const { user: authUser } = useAuth();
+  const toast = useToast();
   const [tab, setTab] = useState('overview');
   const [editing, setEditing] = useState(false);
-  const u = CURRENT_USER;
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [editForm, setEditForm] = useState({ displayName: '', bio: '' });
+
+  const isOwn = authUser?.id === userId;
+
+  useEffect(() => {
+    let cancelled = false;
+    (isOwn ? profileApi.getMe() : profileApi.getPublic(userId))
+      .then(data => {
+        if (cancelled) return;
+        setProfile(data);
+        setEditForm({ displayName: data.displayName, bio: data.bio ?? '' });
+        setLoading(false);
+      })
+      .catch(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [userId, isOwn]);
+
+  const handleSave = async () => {
+    if (!profile) return;
+    setSaveLoading(true);
+    try {
+      const updated = await profileApi.updateMe({
+        displayName: editForm.displayName,
+        bio: editForm.bio || null,
+        avatarUrl: profile.avatarUrl,
+        bannerUrl: profile.bannerUrl,
+        region: profile.region,
+        statusMessage: profile.statusMessage,
+        visibility: profile.visibility,
+      });
+      setProfile(updated);
+      setEditing(false);
+      toast.push({ kind: 'success', title: 'Profile saved.' });
+    } catch (e) {
+      toast.push({ kind: 'default', title: e instanceof ApiError ? e.message : 'Could not save profile.' });
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="page">
+        <div className="card-elev" style={{ padding: 40, textAlign: 'center', color: 'var(--text-lo)' }}>
+          Loading profile…
+        </div>
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="page">
+        <div className="card-elev" style={{ padding: 40, textAlign: 'center', color: 'var(--text-lo)' }}>
+          Profile not found or private.
+        </div>
+      </div>
+    );
+  }
+
+  const avatarUser = { initials: profile.initials, color: profile.color, status: 'online' as const };
+  const joinedYear = new Date(profile.joinedAt).getFullYear();
 
   return (
     <div className="page">
       <div className="card-elev" style={{ overflow: 'hidden', padding: 0 }}>
-        <div style={{ height: 160, position: 'relative', background: 'linear-gradient(135deg, #0F1422 0%, #1B2238 50%, #0B0F18 100%)' }}>
+        <div style={{ height: 160, position: 'relative', background: profile.bannerUrl ? `url(${profile.bannerUrl}) center/cover` : 'linear-gradient(135deg, #0F1422 0%, #1B2238 50%, #0B0F18 100%)' }}>
           <div className="grid-bg" style={{ opacity: 0.5 }} />
-          <div style={{ position: 'absolute', top: 14, right: 14 }}>
-            <Button size="sm" variant="ghost" icon={editing ? 'check' : 'edit'} onClick={() => setEditing(v => !v)}>
-              {editing ? 'Save' : 'Edit profile'}
-            </Button>
-          </div>
+          {isOwn && (
+            <div style={{ position: 'absolute', top: 14, right: 14 }}>
+              {editing ? (
+                <div className="row" style={{ gap: 6 }}>
+                  <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
+                  <Button size="sm" icon="check" onClick={handleSave} disabled={saveLoading}>
+                    {saveLoading ? '…' : 'Save'}
+                  </Button>
+                </div>
+              ) : (
+                <Button size="sm" variant="ghost" icon="edit" onClick={() => setEditing(true)}>
+                  Edit profile
+                </Button>
+              )}
+            </div>
+          )}
         </div>
         <div style={{ padding: '0 24px 24px', marginTop: -44 }}>
           <div className="row between" style={{ alignItems: 'flex-end', flexWrap: 'wrap', gap: 12 }}>
             <div className="row" style={{ gap: 18, alignItems: 'flex-end' }}>
-              <Avatar user={u} size="xl" showPresence />
+              <Avatar user={avatarUser} size="xl" showPresence />
               <div style={{ paddingBottom: 6 }}>
                 {!editing ? (
                   <>
-                    <div className="font-display" style={{ fontSize: 24, fontWeight: 600 }}>{u.display}</div>
-                    <div className="mono" style={{ fontSize: 12, color: 'var(--text-lo)' }}>@{u.username} · joined {u.joined}</div>
+                    <div className="font-display" style={{ fontSize: 24, fontWeight: 600 }}>{profile.displayName}</div>
+                    <div className="mono" style={{ fontSize: 12, color: 'var(--text-lo)' }}>
+                      @{profile.username} · joined {joinedYear} · {profile.region}
+                    </div>
+                    {profile.statusMessage && (
+                      <div style={{ fontSize: 12, color: 'var(--text-md)', marginTop: 4 }}>{profile.statusMessage}</div>
+                    )}
                   </>
                 ) : (
                   <div className="col" style={{ gap: 8, maxWidth: 380 }}>
-                    <input className="input" defaultValue={u.display} placeholder="Display name" />
-                    <input className="input" defaultValue={u.username} placeholder="Username" />
+                    <input className="input" value={editForm.displayName} placeholder="Display name"
+                      onChange={e => setEditForm(f => ({ ...f, displayName: e.target.value }))} />
                   </div>
                 )}
               </div>
             </div>
             <div className="row" style={{ gap: 8 }}>
-              <span className="chip chip--red chip--mono"><Icon name="crown" size={12} /> {u.rank}</span>
-              <span className="chip chip--mono">{u.elo} ELO</span>
-              <span className="chip chip--mono">Lv {u.level}</span>
+              <span className="chip chip--mono">{profile.elo} ELO</span>
+              <span className="chip chip--mono">Lv {profile.level}</span>
+              <span className="chip chip--mono" style={{ textTransform: 'capitalize' }}>{profile.role}</span>
             </div>
           </div>
           {!editing ? (
-            <p style={{ marginTop: 14, maxWidth: 640 }}>{u.bio}</p>
+            profile.bio && <p style={{ marginTop: 14, maxWidth: 640 }}>{profile.bio}</p>
           ) : (
-            <textarea className="input" defaultValue={u.bio} style={{ marginTop: 14, minHeight: 80, padding: 12, resize: 'vertical', width: '100%' }} />
+            <textarea
+              className="input"
+              value={editForm.bio}
+              placeholder="Bio (optional)"
+              style={{ marginTop: 14, minHeight: 80, padding: 12, resize: 'vertical', width: '100%' }}
+              onChange={e => setEditForm(f => ({ ...f, bio: e.target.value }))}
+            />
+          )}
+          {profile.links.length > 0 && (
+            <div className="row" style={{ gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
+              {profile.links.map(link => (
+                <a key={link.id} href={link.url} target="_blank" rel="noopener noreferrer"
+                  className="chip chip--mono" style={{ fontSize: 11, gap: 4 }}>
+                  <Icon name="link" size={10} />
+                  {link.displayLabel ?? link.platform}
+                </a>
+              ))}
+            </div>
           )}
         </div>
       </div>
 
+      {/* Stats — placeholders until Module 10 */}
       <div className="grid grid-4" style={{ marginTop: 18 }}>
-        <StatCard label="Matches"     value="218" trend="+12" hint="lifetime"   icon="controller" />
-        <StatCard label="Win rate"    value="64%" trend="+3%" hint="last 30d"   icon="trophy" />
-        <StatCard label="Best streak" value="11W"             hint="all-time"   icon="flame" />
-        <StatCard label="Friends"     value="36"  trend="+2"  hint="this week"  icon="users" accent="ice" />
+        <StatCard label="Matches"     value="—"  hint="Module 10"   icon="controller" />
+        <StatCard label="Win rate"    value="—"  hint="Module 10"   icon="trophy" />
+        <StatCard label="Best streak" value="—"  hint="Module 10"   icon="flame" />
+        <StatCard label="Friends"     value="—"  hint="Module 3"    icon="users" accent="ice" />
       </div>
 
       <div style={{ marginTop: 24 }}>
