@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Icon } from '@/components/ui/Icons';
@@ -24,8 +24,15 @@ export function MobileNavDrawer({ open, onClose }: MobileNavDrawerProps) {
   const pathname = usePathname();
   const { user } = useAuth();
 
-  // Close on route change
-  useEffect(() => { onClose(); }, [pathname, onClose]);
+  // Close only when the pathname actually changes (not on mount or when onClose
+  // changes reference, which happens every re-render since it's an inline arrow).
+  const prevPathnameRef = useRef(pathname);
+  useEffect(() => {
+    if (prevPathnameRef.current !== pathname) {
+      prevPathnameRef.current = pathname;
+      onClose();
+    }
+  }, [pathname, onClose]);
 
   // Trap body scroll while open
   useEffect(() => {
