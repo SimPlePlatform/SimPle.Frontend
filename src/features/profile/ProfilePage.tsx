@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
@@ -163,7 +163,7 @@ export function ProfilePage({ userId }: { userId: string }) {
     return (
       <div className="page">
         <div className="card-elev" style={{ padding: 40, textAlign: 'center', color: 'var(--text-lo)' }}>
-          Loading profile…
+          Loading profileâ€¦
         </div>
       </div>
     );
@@ -202,7 +202,7 @@ export function ProfilePage({ userId }: { userId: string }) {
               />
               <Button size="sm" variant="ghost" icon="more" aria-label="Cover options" onClick={() => setBannerMenuOpen(v => !v)} />
               {bannerMenuOpen && (
-                <div className="card" style={{ position: 'absolute', top: 36, right: 0, zIndex: 5, minWidth: 190, padding: 6 }}>
+                <div className="card dropdown-panel mobile-menu-panel" style={{ position: 'absolute', top: 36, right: 0, zIndex: 5, minWidth: 190, padding: 6 }}>
                   <button className="row" style={{ width: '100%', gap: 8, padding: 8, fontSize: 13 }} onClick={() => bannerInputRef.current?.click()}>
                     <Icon name="edit" size={14} /> {profile.hasUploadedBanner ? 'Change cover picture' : 'Upload cover picture'}
                   </button>
@@ -237,7 +237,7 @@ export function ProfilePage({ userId }: { userId: string }) {
                 <div className="row" style={{ gap: 6 }}>
                   <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
                   <Button size="sm" icon="check" onClick={handleSave} disabled={saveLoading}>
-                    {saveLoading ? '…' : 'Save'}
+                    {saveLoading ? 'â€¦' : 'Save'}
                   </Button>
                 </div>
               ) : (
@@ -249,8 +249,8 @@ export function ProfilePage({ userId }: { userId: string }) {
           )}
         </div>
         <div style={{ padding: '0 24px 24px', marginTop: -44 }}>
-          <div className="row between" style={{ alignItems: 'flex-end', flexWrap: 'wrap', gap: 12 }}>
-            <div className="row" style={{ gap: 18, alignItems: 'flex-end' }}>
+          <div className="row between mobile-wrap" style={{ alignItems: 'flex-end', flexWrap: 'wrap', gap: 12 }}>
+            <div className="row mobile-wrap" style={{ gap: 18, alignItems: 'flex-end' }}>
               <div style={{ position: 'relative' }}>
                 <input
                   ref={avatarInputRef}
@@ -279,7 +279,7 @@ export function ProfilePage({ userId }: { userId: string }) {
                   </button>
                 )}
                 {avatarMenuOpen && (
-                  <div className="card" style={{ position: 'absolute', left: 0, top: 84, zIndex: 5, minWidth: 210, padding: 6 }}>
+                  <div className="card dropdown-panel mobile-menu-panel" style={{ position: 'absolute', left: 0, top: 84, zIndex: 5, minWidth: 210, padding: 6 }}>
                     <button className="row" style={{ width: '100%', gap: 8, padding: 8, fontSize: 13 }} onClick={() => avatarInputRef.current?.click()}>
                       <Icon name="edit" size={14} /> Upload profile picture
                     </button>
@@ -312,7 +312,7 @@ export function ProfilePage({ userId }: { userId: string }) {
                   <>
                     <div className="font-display" style={{ fontSize: 24, fontWeight: 600 }}>{profile.displayName}</div>
                     <div className="mono" style={{ fontSize: 12, color: 'var(--text-lo)' }}>
-                      @{profile.username} · joined {joinedYear}{regionText ? ` · ${regionText}` : ''}
+                      @{profile.username} Â· joined {joinedYear}{regionText ? ` Â· ${regionText}` : ''}
                     </div>
                     {profile.statusMessage && (
                       <div style={{ fontSize: 12, color: 'var(--text-md)', marginTop: 4 }}>{profile.statusMessage}</div>
@@ -326,7 +326,7 @@ export function ProfilePage({ userId }: { userId: string }) {
                 )}
               </div>
             </div>
-            <div className="row" style={{ gap: 8 }}>
+            <div className="row mobile-wrap" style={{ gap: 8 }}>
               <span className="chip chip--mono">{profile.elo} ELO</span>
               <span className="chip chip--mono">Lv {profile.level}</span>
               <span className="chip chip--mono">{profile.profileType}</span>
@@ -358,12 +358,12 @@ export function ProfilePage({ userId }: { userId: string }) {
         </div>
       </div>
 
-      {/* Stats — placeholders until Module 10 */}
+      {/* Stats â€” placeholders until Module 10 */}
       <div className="grid grid-4" style={{ marginTop: 18 }}>
-        <StatCard label="Matches"     value="—"  hint="Module 10"   icon="controller" />
-        <StatCard label="Win rate"    value="—"  hint="Module 10"   icon="trophy" />
-        <StatCard label="Best streak" value="—"  hint="Module 10"   icon="flame" />
-        <StatCard label="Friends"     value="—"  hint="Module 3"    icon="users" accent="ice" />
+        <StatCard label="Matches"     value="â€”"  hint="Module 10"   icon="controller" />
+        <StatCard label="Win rate"    value="â€”"  hint="Module 10"   icon="trophy" />
+        <StatCard label="Best streak" value="â€”"  hint="Module 10"   icon="flame" />
+        <StatCard label="Friends"     value="â€”"  hint="Module 3"    icon="users" accent="ice" />
       </div>
 
       <div style={{ marginTop: 24 }}>
@@ -391,7 +391,7 @@ export function ProfilePage({ userId }: { userId: string }) {
 
 function ProfileOverview() {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 18 }}>
+    <div className="responsive-split" style={{ gridTemplateColumns: '1.4fr 1fr' }}>
       <PerformanceChart />
       <div className="col" style={{ gap: 18 }}>
         <FavoriteGames compact />
@@ -447,7 +447,7 @@ function MatchHistoryTable() {
   const matches = [...RECENT_MATCHES, ...RECENT_MATCHES.map((m, i) => ({ ...m, id: m.id + 'x' + i, when: '4d ago' }))];
   return (
     <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-      <div className="row" style={{ padding: '12px 18px', borderBottom: '1px solid var(--border-1)' }}>
+      <div className="match-history-header row" style={{ padding: '12px 18px', borderBottom: '1px solid var(--border-1)' }}>
         <div className="uppercase-label" style={{ width: 120 }}>Result</div>
         <div className="uppercase-label" style={{ flex: 1 }}>Game / Opponent</div>
         <div className="uppercase-label" style={{ width: 120 }}>Duration</div>
@@ -457,7 +457,7 @@ function MatchHistoryTable() {
       {matches.map(m => {
         const c = m.result === 'win' ? 'var(--success)' : m.result === 'loss' ? 'var(--danger)' : 'var(--text-lo)';
         return (
-          <div key={m.id} className="row" style={{ padding: '12px 18px', borderBottom: '1px solid var(--border-1)' }}>
+          <div key={m.id} className="match-history-row row" style={{ padding: '12px 18px', borderBottom: '1px solid var(--border-1)' }}>
             <div className="row" style={{ width: 120, gap: 8 }}>
               <div style={{ width: 6, height: 18, background: c, borderRadius: 3 }} />
               <span style={{ textTransform: 'uppercase', fontSize: 11, color: c, fontWeight: 600, letterSpacing: '0.06em', fontFamily: 'var(--font-mono)' }}>{m.result}</span>

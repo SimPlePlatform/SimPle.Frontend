@@ -36,9 +36,9 @@ export function LeaderboardPage() {
         <StatCard label="Best season" value="Master" hint="Season 2"   icon="crown" />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 18, marginTop: 24 }}>
+      <div className="responsive-sidebar" style={{ gridTemplateColumns: '1fr 320px', marginTop: 24 }}>
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div className="row between" style={{ padding: '14px 18px', borderBottom: '1px solid var(--border-1)' }}>
+          <div className="row between mobile-wrap" style={{ padding: '14px 18px', borderBottom: '1px solid var(--border-1)' }}>
             <Tabs
               value={game}
               onChange={setGame}
@@ -51,7 +51,7 @@ export function LeaderboardPage() {
             />
             <Button size="sm" variant="ghost" icon="refresh">Refresh</Button>
           </div>
-          <div className="row" style={{ padding: '10px 18px' }}>
+          <div className="leaderboard-header row" style={{ padding: '10px 18px' }}>
             <div className="uppercase-label" style={{ width: 60 }}>Rank</div>
             <div className="uppercase-label" style={{ flex: 1 }}>Player</div>
             <div className="uppercase-label" style={{ width: 80 }}>Region</div>
@@ -60,7 +60,7 @@ export function LeaderboardPage() {
           </div>
           {LEADERBOARD_GLOBAL.map(r => <LBRow key={r.rank} row={r} />)}
           <div style={{ padding: '12px 18px', borderTop: '1px dashed var(--border-2)', background: 'var(--red-soft)' }}>
-            <div className="row" style={{ alignItems: 'center' }}>
+            <div className="leaderboard-row row" style={{ alignItems: 'center' }}>
               <div className="mono" style={{ width: 60, fontWeight: 700, color: 'var(--red-400)' }}>#142</div>
               <div className="row" style={{ flex: 1, gap: 10 }}>
                 <Avatar user={CURRENT_USER} size="sm" />
@@ -86,14 +86,14 @@ function LBRow({ row }: { row: LeaderboardRow }) {
   const medals = ['#F59E0B', '#94A3B8', '#B45309'];
   const medal = row.rank <= 3 ? medals[row.rank - 1] : null;
   return (
-    <div className="row" style={{ padding: '10px 18px', borderTop: '1px solid var(--border-1)' }}>
+    <div className="leaderboard-row row" style={{ padding: '10px 18px', borderTop: '1px solid var(--border-1)' }}>
       <div className="mono" style={{ width: 60, fontWeight: 600, color: medal ?? 'var(--text-md)', display: 'flex', alignItems: 'center', gap: 6 }}>
         {medal && <Icon name="crown" size={14} />}
         #{row.rank}
       </div>
-      <div className="row" style={{ flex: 1, gap: 10 }}>
+      <div className="row" style={{ flex: 1, gap: 10, minWidth: 0 }}>
         <Avatar user={{ initials: row.name.split(' ').map(s => s[0]).slice(0, 2).join(''), color: PALETTE[row.rank % 8] }} size="sm" />
-        <span style={{ fontWeight: 600 }}>{row.name}</span>
+        <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.name}</span>
       </div>
       <div className="mono" style={{ width: 80, color: 'var(--text-md)' }}>{row.country}</div>
       <div className="mono" style={{ width: 100, textAlign: 'right', fontWeight: 600 }}>{row.elo.toLocaleString()}</div>

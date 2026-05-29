@@ -51,7 +51,7 @@ export function LobbyPage({ lobbyId }: { lobbyId: string }) {
     <div className="page">
       <div className="between" style={{ flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <div className="row" style={{ gap: 8 }}>
+          <div className="row mobile-wrap" style={{ gap: 8 }}>
             <span className="chip chip--red chip--mono"><span className="dot dot--playing" />Lobby active</span>
             <span className="chip chip--mono">{privacy === 'private' ? 'Private' : 'Public'}</span>
             <span className="chip chip--mono">{timeMode}</span>
@@ -59,7 +59,7 @@ export function LobbyPage({ lobbyId }: { lobbyId: string }) {
           <div className="page-title" style={{ marginTop: 10 }}>{game.name} Â· Lobby</div>
           <div className="page-sub">Hosted by you Â· region Auto Â· est. start in 30s</div>
         </div>
-        <div className="row" style={{ gap: 8 }}>
+        <div className="row mobile-actions" style={{ gap: 8 }}>
           <button
             className="chip chip--mono"
             onClick={copyCode}
@@ -74,17 +74,17 @@ export function LobbyPage({ lobbyId }: { lobbyId: string }) {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 18, marginTop: 22 }}>
+      <div className="responsive-split" style={{ gridTemplateColumns: '1.6fr 1fr', marginTop: 22 }}>
         <div className="col" style={{ gap: 18 }}>
           <div className="card-elev" style={{ padding: 22 }}>
-            <div className="row between">
+            <div className="row between mobile-wrap">
               <div>
                 <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}>
                   Players Â· {slotsWithAi.filter(s => s.kind !== 'empty').length} / {slots.length}
                 </div>
                 <div className="page-sub">Host can kick or promote.</div>
               </div>
-              <div className="row" style={{ gap: 6 }}>
+              <div className="row mobile-actions" style={{ gap: 6 }}>
                 <Button size="sm" variant="ghost" icon="plus" onClick={() => setSlots(s => [...s, { kind: 'empty' }])}>Add slot</Button>
                 <Button size="sm" variant="ghost" icon="refresh" onClick={() => setSlots(s => s.map(slot => slot.kind === 'empty' ? slot : { ...slot, ready: !slot.ready }))}>Toggle ready</Button>
               </div>
@@ -94,12 +94,12 @@ export function LobbyPage({ lobbyId }: { lobbyId: string }) {
               {slotsWithAi.map((s, i) => <SlotCard key={i} slot={s} seat={i + 1} />)}
             </div>
 
-            <div className="row between" style={{ marginTop: 18 }}>
-              <div className="row" style={{ gap: 8 }}>
+            <div className="row between mobile-wrap" style={{ marginTop: 18 }}>
+              <div className="row mobile-wrap" style={{ gap: 8 }}>
                 <Toggle on={aiFill} onChange={setAiFill} label="Fill empty seats with AI" />
                 <span className="chip chip--mono">AI Â· {game.aiLevels[1]}</span>
               </div>
-              <div className="row" style={{ gap: 8 }}>
+              <div className="row mobile-actions" style={{ gap: 8 }}>
                 {allReady ? (
                   <Button size="lg" icon="play" onClick={() => router.push(ROUTES.room(lobbyId))}>Start match</Button>
                 ) : (
@@ -134,11 +134,11 @@ export function LobbyPage({ lobbyId }: { lobbyId: string }) {
 function SlotCard({ slot, seat }: { slot: LobbySlot; seat: number }) {
   if (slot.kind === 'empty') {
     return (
-      <div className="surface" style={{ padding: 16, borderStyle: 'dashed', display: 'flex', alignItems: 'center', gap: 12, minHeight: 80 }}>
+      <div className="surface mobile-wrap" style={{ padding: 16, borderStyle: 'dashed', display: 'flex', alignItems: 'center', gap: 12, minHeight: 80 }}>
         <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--bg-3)', color: 'var(--text-lo)', display: 'grid', placeItems: 'center', border: '1px dashed var(--border-3)' }}>
           <Icon name="plus" size={16} />
         </div>
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-md)' }}>Seat {seat} Â· Empty</div>
           <div className="mono" style={{ fontSize: 11, color: 'var(--text-lo)' }}>Invite a friend or fill with AI</div>
         </div>
@@ -149,17 +149,17 @@ function SlotCard({ slot, seat }: { slot: LobbySlot; seat: number }) {
 
   const isAi = slot.kind === 'ai';
   return (
-    <div className="surface" style={{ padding: 14, display: 'flex', alignItems: 'center', gap: 12, minHeight: 80, borderColor: slot.ready ? 'rgba(52,211,153,0.25)' : 'var(--border-2)' }}>
+    <div className="surface mobile-wrap" style={{ padding: 14, display: 'flex', alignItems: 'center', gap: 12, minHeight: 80, borderColor: slot.ready ? 'rgba(52,211,153,0.25)' : 'var(--border-2)' }}>
       <Avatar user={slot.user!} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div className="row" style={{ gap: 8 }}>
+        <div className="row mobile-wrap" style={{ gap: 8 }}>
           <span style={{ fontWeight: 600, fontSize: 13.5 }}>{slot.user?.display}</span>
           {slot.kind === 'host' && <span className="chip chip--red chip--mono"><Icon name="crown" size={11} /> Host</span>}
           {isAi && <span className="chip chip--mono"><Icon name="ai" size={11} /> AI</span>}
         </div>
         <div className="mono" style={{ fontSize: 11, color: 'var(--text-lo)' }}>{isAi ? 'Difficulty: Hard' : `Seat ${seat} Â· Auto`}</div>
       </div>
-      <div className="row" style={{ gap: 6 }}>
+      <div className="row mobile-wrap" style={{ gap: 6 }}>
         <span className={`chip ${slot.ready ? 'chip--success' : 'chip--warn'}`}>
           <span className={`dot ${slot.ready ? 'dot--online' : 'dot--away'}`} />
           {slot.ready ? 'Ready' : 'Not ready'}
@@ -182,7 +182,7 @@ function SettingDropdown({ label, value, options, onChange }: {
         <Icon name="chevronDown" size={14} style={{ color: 'var(--text-lo)' }} />
       </button>
       {open && (
-        <div className="card-elev" style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 6, zIndex: 20, padding: 6, overflow: 'hidden' }}>
+        <div className="card-elev dropdown-panel" style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 6, zIndex: 20, padding: 6, overflow: 'hidden' }}>
           {options.map(o => (
             <button
               key={o}
@@ -217,7 +217,7 @@ function InviteFriendsPanel() {
       </div>
       <div className="col" style={{ marginTop: 10, gap: 4, maxHeight: 280, overflow: 'auto' }}>
         {list.map(f => (
-          <div key={f.id} className="row" style={{ padding: '8px 6px', borderRadius: 8, gap: 10 }}>
+          <div key={f.id} className="row mobile-wrap" style={{ padding: '8px 6px', borderRadius: 8, gap: 10 }}>
             <Avatar user={f} size="sm" showPresence />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 12.5, fontWeight: 600 }}>{f.display}</div>

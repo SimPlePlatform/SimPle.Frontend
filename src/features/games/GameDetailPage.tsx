@@ -31,7 +31,7 @@ export function GameDetailPage({ gameId }: { gameId: string }) {
         <Icon name="chevronLeft" size={14} /> Game library
       </button>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 18, marginTop: 18 }}>
+      <div className="responsive-split" style={{ gridTemplateColumns: '1.4fr 1fr', marginTop: 18 }}>
         <div className="card-elev" style={{ padding: 0, overflow: 'hidden' }}>
           <GameArt game={game} h={260} />
           <div style={{ padding: 22 }}>
@@ -40,12 +40,12 @@ export function GameDetailPage({ gameId }: { gameId: string }) {
                 <div className="font-display" style={{ fontSize: 32, fontWeight: 600, letterSpacing: '-0.02em' }}>{game.name}</div>
                 <div style={{ fontSize: 13, color: 'var(--text-lo)', marginTop: 4 }}>{game.tag}</div>
               </div>
-              <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+              <div className="row mobile-wrap" style={{ gap: 6, flexWrap: 'wrap' }}>
                 {game.cats.map(c => <span key={c} className="chip">{c}</span>)}
               </div>
             </div>
 
-            <div className="row" style={{ gap: 18, marginTop: 18, flexWrap: 'wrap' }}>
+            <div className="row mobile-wrap" style={{ gap: 18, marginTop: 18, flexWrap: 'wrap' }}>
               <InlineStat label="Players" value={`${game.minPlayers}–${game.maxPlayers}`} icon="users" />
               <InlineStat label="Duration" value={game.duration} icon="clock" />
               <InlineStat label="Difficulty" value={game.difficulty} icon="signal" />
@@ -117,8 +117,8 @@ export function GameDetailPage({ gameId }: { gameId: string }) {
           </div>
 
           <div className="card" style={{ padding: 18 }}>
-            <div className="row between">
-              <div className="row" style={{ gap: 8 }}>
+            <div className="row between mobile-wrap">
+              <div className="row" style={{ gap: 8, minWidth: 0 }}>
                 <div style={{ width: 30, height: 30, borderRadius: 9, background: 'rgba(56,189,248,0.10)', color: 'var(--ice-400)', display: 'grid', placeItems: 'center' }}>
                   <Icon name="users" size={14} />
                 </div>
@@ -131,7 +131,7 @@ export function GameDetailPage({ gameId }: { gameId: string }) {
             </div>
             <div className="col" style={{ marginTop: 12, gap: 8 }}>
               {FRIENDS.slice(0, 3).map(f => (
-                <div key={f.id} className="row" style={{ gap: 10 }}>
+                <div key={f.id} className="row mobile-wrap" style={{ gap: 10 }}>
                   <Avatar user={f} size="sm" showPresence />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 12.5, fontWeight: 600 }}>{f.display}</div>

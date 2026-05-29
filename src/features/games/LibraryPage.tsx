@@ -31,7 +31,7 @@ export function LibraryPage() {
           <div className="page-title">Game Library</div>
           <div className="page-sub">{GAMES.length} games · 6,432 players online right now</div>
         </div>
-        <div style={{ position: 'relative', minWidth: 280 }}>
+        <div style={{ position: 'relative', width: 'min(100%, 280px)' }}>
           <Icon name="search" size={15} style={{ position: 'absolute', left: 11, top: 11, color: 'var(--text-lo)' }} />
           <input
             className="input"
@@ -43,13 +43,13 @@ export function LibraryPage() {
         </div>
       </div>
 
-      <div className="row" style={{ marginTop: 22, gap: 12, justifyContent: 'space-between', flexWrap: 'wrap' }}>
+      <div className="row mobile-wrap" style={{ marginTop: 22, gap: 12, justifyContent: 'space-between', flexWrap: 'wrap' }}>
         <Tabs
           value={filter}
           onChange={setFilter}
           items={FILTERS.map(f => ({ value: f, label: f, count: f === 'All' ? GAMES.length : undefined }))}
         />
-        <div className="row" style={{ gap: 8 }}>
+        <div className="row mobile-actions" style={{ gap: 8 }}>
           <Button size="sm" variant="ghost" icon="filter">More filters</Button>
           <Button size="sm" variant="ghost" icon="list">Sort: Popular</Button>
         </div>
@@ -78,14 +78,14 @@ export function LibraryPage() {
 function FeaturedBanner({ onEnter }: { onEnter: () => void }) {
   const g = GAMES[3];
   return (
-    <div className="card-elev" style={{ marginTop: 20, padding: 0, overflow: 'hidden', display: 'grid', gridTemplateColumns: '1fr 1fr', minHeight: 200 }}>
+    <div className="card-elev responsive-split" style={{ marginTop: 20, padding: 0, overflow: 'hidden', gridTemplateColumns: '1fr 1fr', minHeight: 200 }}>
       <div style={{ padding: 24, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
         <span className="chip chip--red chip--mono" style={{ alignSelf: 'flex-start' }}>
           <Icon name="sparkle" size={12} /> Spotlight
         </span>
         <div className="font-display" style={{ fontSize: 28, fontWeight: 600, marginTop: 14 }}>Chess Lite · Blitz Season</div>
         <p style={{ marginTop: 8, maxWidth: 380 }}>3-minute blitz with bullet endings. Climb a dedicated ladder for the next 4 weeks.</p>
-        <div className="row" style={{ gap: 8, marginTop: 18 }}>
+        <div className="row mobile-actions" style={{ gap: 8, marginTop: 18 }}>
           <Button onClick={onEnter}>Enter event</Button>
           <Button variant="ghost">Read rules</Button>
         </div>

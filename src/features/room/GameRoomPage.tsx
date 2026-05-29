@@ -57,9 +57,9 @@ export function GameRoomPage({ matchId }: { matchId: string }) {
   };
 
   return (
-    <div style={{ padding: '22px 36px 36px', maxWidth: 1440, margin: '0 auto' }}>
+    <div className="page game-room-page">
       <div className="row between" style={{ marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
-        <div className="row" style={{ gap: 8 }}>
+        <div className="row mobile-scroll-row" style={{ gap: 8 }}>
           <button className="btn btn-ghost btn-sm" onClick={() => router.push(ROUTES.games)}>
             <Icon name="chevronLeft" size={14} /> Exit
           </button>
@@ -67,14 +67,14 @@ export function GameRoomPage({ matchId }: { matchId: string }) {
           <span className="chip chip--mono">{isAi ? 'Vs AI · Hard' : 'Vs Friend'}</span>
           <span className="chip chip--mono">Lobby SP-7F-29</span>
         </div>
-        <div className="row" style={{ gap: 8 }}>
+        <div className="row mobile-actions" style={{ gap: 8 }}>
           <Button size="sm" variant="ghost" icon="pause" onClick={() => setPaused(true)}>Pause</Button>
           <Button size="sm" variant="ghost" icon="flag" onClick={() => setResolved('loss')}>Forfeit</Button>
           <Button size="sm" variant="ghost" icon="settings">Settings</Button>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr 320px', gap: 18, alignItems: 'start' }}>
+      <div className="responsive-room" style={{ gridTemplateColumns: '260px 1fr 320px' }}>
         <div className="col" style={{ gap: 14 }}>
           <PlayerPanel user={CURRENT_USER} you turn={turn === 'you'} score={score.you} timer="04:18" />
           <div className="card" style={{ padding: 18 }}>
@@ -85,13 +85,13 @@ export function GameRoomPage({ matchId }: { matchId: string }) {
           <PlayerPanel user={opp} turn={turn === 'opp'} score={score.opp} timer="05:02" />
         </div>
 
-        <div className="card-elev" style={{ padding: 20 }}>
-          <div className="row between" style={{ marginBottom: 14 }}>
-            <div className="row" style={{ gap: 8 }}>
+        <div className="card-elev" style={{ padding: 20, overflow: 'hidden' }}>
+          <div className="row between mobile-wrap" style={{ marginBottom: 14 }}>
+            <div className="row mobile-wrap" style={{ gap: 8 }}>
               <span className="chip chip--red chip--mono"><span className="dot dot--playing" /> {turn === 'you' ? 'Your move' : "Opponent's move"}</span>
               <span className="chip chip--mono">Round 3 / 5</span>
             </div>
-            <div className="row" style={{ gap: 8 }}>
+            <div className="row mobile-actions" style={{ gap: 8 }}>
               <Button size="sm" variant="ghost" icon="bolt">Hint</Button>
               <Button size="sm" variant="ghost" icon="refresh">Undo</Button>
             </div>
@@ -128,7 +128,7 @@ export function GameRoomPage({ matchId }: { matchId: string }) {
       >
         <p>The match is paused for both players. Your opponent has been notified.</p>
         <div className="surface" style={{ marginTop: 14, padding: 12 }}>
-          <div className="row" style={{ gap: 8 }}>
+            <div className="row" style={{ gap: 8, alignItems: 'flex-start' }}>
             <Icon name="shield" size={14} style={{ color: 'var(--text-lo)' }} />
             <span className="mono" style={{ fontSize: 11, color: 'var(--text-lo)' }}>Pauses are limited to 2 per match (1 used).</span>
           </div>
@@ -221,7 +221,7 @@ function SudokuBoard({ selected, setSelected }: { selected: number; setSelected:
   const col = selected % 9;
   const box = [Math.floor(row / 3), Math.floor(col / 3)];
   return (
-    <div className="sudoku" style={{ maxWidth: 520, margin: '0 auto' }}>
+    <div className="sudoku" style={{ margin: '0 auto' }}>
       {Array.from({ length: 81 }).map((_, i) => {
         const v = SUDOKU_GIVEN[i];
         const r = Math.floor(i / 9), c = i % 9;

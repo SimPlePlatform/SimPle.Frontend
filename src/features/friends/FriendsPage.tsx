@@ -26,7 +26,7 @@ export function FriendsPage() {
           <div className="page-title">Friends</div>
           <div className="page-sub">{FRIENDS.length} total · {online.length} online · {FRIEND_REQUESTS.length} pending requests</div>
         </div>
-        <div className="row" style={{ gap: 8 }}>
+        <div className="row mobile-actions" style={{ gap: 8 }}>
           <Button variant="ghost" icon="share">Share invite link</Button>
           <Button
             icon="plus"
@@ -35,7 +35,7 @@ export function FriendsPage() {
         </div>
       </div>
 
-      <div className="row" style={{ marginTop: 22, gap: 12, justifyContent: 'space-between', flexWrap: 'wrap' }}>
+      <div className="row mobile-wrap" style={{ marginTop: 22, gap: 12, justifyContent: 'space-between', flexWrap: 'wrap' }}>
         <Tabs
           value={tab}
           onChange={setTab}
@@ -46,7 +46,7 @@ export function FriendsPage() {
             { value: 'suggest',  label: 'Suggestions',  count: SUGGESTED.length, icon: 'sparkle' },
           ]}
         />
-        <div style={{ position: 'relative', minWidth: 260 }}>
+        <div style={{ position: 'relative', width: 'min(100%, 260px)' }}>
           <Icon name="search" size={15} style={{ position: 'absolute', left: 11, top: 11, color: 'var(--text-lo)' }} />
           <input
             className="input"
@@ -58,7 +58,7 @@ export function FriendsPage() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 18, marginTop: 22 }}>
+      <div className="responsive-split" style={{ gridTemplateColumns: '2fr 1fr', marginTop: 22 }}>
         <div className="card" style={{ padding: 18 }}>
           {tab === 'requests' ? <RequestsList /> :
            tab === 'suggest'  ? <SuggestionsList /> :
@@ -87,14 +87,14 @@ function FriendList({ list }: { list: Friend[] }) {
   if (!list.length) return <EmptyState icon="users" title="Nobody matches that." body="Try clearing the search or invite someone new." />;
   return (
     <div className="col" style={{ gap: 2 }}>
-      <div className="row" style={{ padding: '6px 10px' }}>
+      <div className="friends-header row" style={{ padding: '6px 10px' }}>
         <div className="uppercase-label" style={{ flex: 1 }}>Player</div>
         <div className="uppercase-label" style={{ width: 160 }}>Status</div>
         <div className="uppercase-label" style={{ width: 80, textAlign: 'right' }}>ELO</div>
         <div style={{ width: 170 }} />
       </div>
       {list.map(f => (
-        <div key={f.id} className="row" style={{ padding: '10px', borderRadius: 10, gap: 12 }}>
+        <div key={f.id} className="friends-row row" style={{ padding: '10px', borderRadius: 10, gap: 12 }}>
           <Avatar user={f} showPresence />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 13.5, fontWeight: 600 }}>{f.display}</div>
@@ -123,7 +123,7 @@ function RequestsList() {
   return (
     <div className="col" style={{ gap: 8 }}>
       {FRIEND_REQUESTS.map(r => (
-        <div key={r.id} className="surface row" style={{ padding: 14, gap: 12 }}>
+        <div key={r.id} className="surface row mobile-wrap" style={{ padding: 14, gap: 12 }}>
           <Avatar user={r} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 13.5, fontWeight: 600 }}>{r.display}</div>
@@ -145,7 +145,7 @@ function SuggestionsList() {
   return (
     <div className="col" style={{ gap: 8 }}>
       {SUGGESTED.map(s => (
-        <div key={s.id} className="surface row" style={{ padding: 14, gap: 12 }}>
+        <div key={s.id} className="surface row mobile-wrap" style={{ padding: 14, gap: 12 }}>
           <Avatar user={s} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 13.5, fontWeight: 600 }}>{s.display}</div>
@@ -221,7 +221,7 @@ function EmptyFriends({ onAdd }: { onAdd: () => void }) {
       title="Your roster is empty — let's fix that."
       body="Add friends to invite them to lobbies, see when they're online, and climb leaderboards together."
       action={
-        <div className="row" style={{ gap: 8, justifyContent: 'center' }}>
+        <div className="row mobile-actions" style={{ gap: 8, justifyContent: 'center' }}>
           <Button icon="plus" onClick={onAdd}>Add a friend</Button>
           <Button variant="ghost" icon="share">Copy invite link</Button>
         </div>

@@ -29,7 +29,7 @@ export function DashboardPage() {
           <div className="page-title">Good evening, {u.display.split(' ')[0]}.</div>
           <div className="page-sub">{onlineFriends.length} friends online · {NOTIFICATIONS.filter(n => n.kind === 'invite').length} invite waiting</div>
         </div>
-        <div className="row" style={{ gap:8 }}>
+        <div className="row mobile-actions" style={{ gap:8 }}>
           <Button variant="ghost" icon="ai" onClick={() => router.push(ROUTES.games)}>Play vs AI</Button>
           <Button variant="ghost" icon="users" onClick={() => setInviteOpen(true)}>Invite friend</Button>
           <Button icon="plus" onClick={() => setLobbyOpen(true)}>Create lobby</Button>
@@ -37,7 +37,7 @@ export function DashboardPage() {
       </div>
 
       {/* Hero + side panel */}
-      <div style={{ display:'grid', gridTemplateColumns:'1.6fr 1fr', gap:18, marginTop:24 }}>
+      <div className="responsive-split" style={{ gridTemplateColumns:'1.6fr 1fr', marginTop:24 }}>
         <HeroPanel />
         <SideQuickPanel />
       </div>
@@ -81,7 +81,7 @@ export function DashboardPage() {
       </section>
 
       {/* Friends + Matches */}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:18, marginTop:28 }}>
+      <div className="responsive-split" style={{ gridTemplateColumns:'1fr 1fr', marginTop:28 }}>
         <OnlineFriendsPanel />
         <RecentMatchesPanel />
       </div>
@@ -113,18 +113,18 @@ function HeroPanel() {
     <div className="card-elev" style={{ padding:20, position:'relative', overflow:'hidden' }}>
       <div style={{ position:'absolute', inset:0, background:'radial-gradient(600px 280px at 100% -20%, rgba(240,57,75,0.18), transparent 60%)' }} />
       <div style={{ position:'relative' }}>
-        <div className="row between">
+        <div className="row between mobile-wrap">
           <span className="chip chip--red chip--mono"><span className="dot dot--playing" /> Season 4 · ranked open</span>
           <span className="chip chip--mono">Region: {u.region}</span>
         </div>
-        <div className="row" style={{ marginTop:22, gap:18 }}>
+        <div className="row mobile-stack" style={{ marginTop:22, gap:18 }}>
           <Avatar user={u} size="xl" showPresence />
           <div style={{ flex:1, minWidth:0 }}>
-            <div className="row" style={{ gap:10 }}>
+            <div className="row mobile-wrap" style={{ gap:10 }}>
               <div className="font-display" style={{ fontSize:24, fontWeight:600 }}>{u.display}</div>
               <span className="chip chip--mono">@{u.username}</span>
             </div>
-            <div className="row" style={{ gap:10, marginTop:8 }}>
+            <div className="row mobile-wrap" style={{ gap:10, marginTop:8 }}>
               <span className="chip chip--red chip--mono"><Icon name="crown" size={12} /> {u.rank}</span>
               <span className="chip chip--mono">{u.elo} ELO</span>
               <span className="chip chip--mono">Lv {u.level}</span>
@@ -138,7 +138,7 @@ function HeroPanel() {
             </div>
           </div>
         </div>
-        <div className="row" style={{ gap:8, marginTop:20 }}>
+        <div className="row mobile-actions" style={{ gap:8, marginTop:20 }}>
           <Button icon="play" onClick={() => router.push(ROUTES.games)}>Quick match</Button>
           <Button variant="ghost" icon="controller" onClick={() => router.push(ROUTES.lobby('SP-7F-29'))}>Open active lobby</Button>
         </div>
@@ -232,7 +232,7 @@ function OnlineFriendsPanel() {
       </div>
       <div className="col" style={{ marginTop:12, gap:6 }}>
         {online.map(f => (
-          <div key={f.id} className="row" style={{ padding:'10px 8px', borderRadius:10, gap:12 }}>
+          <div key={f.id} className="row mobile-wrap" style={{ padding:'10px 8px', borderRadius:10, gap:12 }}>
             <Avatar user={f} showPresence />
             <div style={{ flex:1, minWidth:0 }}>
               <div className="row" style={{ gap:8 }}>
