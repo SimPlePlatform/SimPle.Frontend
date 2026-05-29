@@ -19,10 +19,12 @@ const themeBootScript = `(function(){try{var s=localStorage.getItem('simple.them
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
-      </head>
       <body>
+        <Script
+          id="simple-theme-boot"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: themeBootScript }}
+        />
         <Script
           id="google-gis"
           src="https://accounts.google.com/gsi/client"

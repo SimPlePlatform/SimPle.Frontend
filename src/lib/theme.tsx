@@ -36,7 +36,14 @@ function applyTheme(theme: Theme) {
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => {
     if (typeof document !== 'undefined') {
-      return (document.documentElement.getAttribute('data-theme') as Theme) || 'dark';
+      const current = document.documentElement.getAttribute('data-theme');
+      if (current === 'light' || current === 'dark') return current;
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored === 'light' || stored === 'dark') return stored;
+      } catch {
+        // Ignore storage failures and fall back to dark.
+      }
     }
     return 'dark';
   });
