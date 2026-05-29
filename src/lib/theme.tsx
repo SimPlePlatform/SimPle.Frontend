@@ -28,12 +28,14 @@ function applyTheme(theme: Theme) {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(() => {
-    if (typeof document !== 'undefined') {
-      return (document.documentElement.getAttribute('data-theme') as Theme) || 'dark';
-    }
-    return 'dark';
-  });
+  // Read the value the boot script set on <html> as the initial state.
+  // The lazy initializer runs only on the client; on the server it falls
+  // back to 'dark' (matching the boot script default).
+  const [theme, setThemeState] = useState<Theme>(() =>
+    typeof document !== 'undefined'
+      ? ((document.documentElement.getAttribute('data-theme') as Theme) || 'dark')
+      : 'dark'
+  );
 
   const setTheme = useCallback((t: Theme) => {
     setThemeState(t);
@@ -41,10 +43,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const toggleTheme = useCallback(() => {
-    setTheme(theme === 'dark' ? 'light' : 'dark');
-  }, [theme, setTheme]);
+    setThemeState(prev => {
+      const next = prev === 'dark' ? 'light' : 'dark';
+      applyTheme(next);
+      return next;
+    });
+  }, []);
 
-  // Sync to system preference if the user has no saved preference.
+  // Follow system preference when no explicit choice is stored.
   useEffect(() => {
     const mq = window.matchMedia?.('(prefers-color-scheme: light)');
     if (!mq) return;

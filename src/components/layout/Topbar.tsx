@@ -12,23 +12,47 @@ import { InviteFriendModal } from '@/components/friends/InviteFriendModal';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { useTheme } from '@/lib/theme';
 
-export function Topbar() {
+export function Topbar({ onHamburger }: { onHamburger?: () => void }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [lobbyOpen, setLobbyOpen]  = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
 
   return (
     <header className="topbar">
-      <div className="row" style={{ flex:1, gap:8 }}>
-        <div style={{ position:'relative', maxWidth:480, flex:1 }}>
+      {/* Hamburger — only visible on mobile (hidden in CSS when sidebar shows) */}
+      <button
+        className="btn btn-ghost btn-icon btn-sm topbar__hamburger"
+        onClick={onHamburger}
+        aria-label="Open navigation menu"
+        style={{ marginRight:4 }}
+      >
+        <Icon name="menu" size={18} />
+      </button>
+      {/* Search — hidden on small screens via .topbar__search class */}
+      <div className="topbar__search row" style={{ flex:1, gap:8, maxWidth:480 }}>
+        <div style={{ position:'relative', flex:1 }}>
           <Icon name="search" size={15} style={{ position:'absolute', left:11, top:11, color:'var(--text-lo)' }} />
           <input className="input" placeholder="Search games, friends, lobbies…" style={{ paddingLeft:34 }} />
           <span className="chip chip--mono" style={{ position:'absolute', right:8, top:7, height:24, fontSize:10 }}>⌘ K</span>
         </div>
       </div>
-      <div className="row" style={{ gap:8 }}>
-        <Button variant="ghost" size="sm" icon="plus" onClick={() => setLobbyOpen(true)}>Create Lobby</Button>
-        <Button variant="ghost" size="sm" icon="users" onClick={() => setInviteOpen(true)}>Invite</Button>
+      {/* Mobile-only search icon (shown when topbar__search is hidden) */}
+      <button className="btn btn-ghost btn-icon btn-sm" aria-label="Search"
+        style={{ display:'none' }} id="topbar-search-icon">
+        <Icon name="search" size={16} />
+      </button>
+      <div className="row" style={{ gap:6 }}>
+        {/* Text CTAs hidden on small screens via .topbar__actions-text */}
+        <span className="topbar__actions-text row" style={{ gap:6 }}>
+          <Button variant="ghost" size="sm" icon="plus" onClick={() => setLobbyOpen(true)}>Create Lobby</Button>
+          <Button variant="ghost" size="sm" icon="users" onClick={() => setInviteOpen(true)}>Invite</Button>
+        </span>
+        {/* Mobile: single + button */}
+        <button className="btn btn-primary btn-icon btn-sm topbar__actions-mobile"
+          onClick={() => setLobbyOpen(true)} aria-label="Create lobby"
+          style={{ display:'none' }}>
+          <Icon name="plus" size={16} />
+        </button>
         <ThemeToggleButton />
         <NotificationBell open={notifOpen} setOpen={setNotifOpen} />
         <div style={{ width:1, height:28, background:'var(--border-1)' }} />

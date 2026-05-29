@@ -68,8 +68,22 @@ export function SettingsPage() {
         <div className="page-sub">Account, gameplay, notifications and more.</div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 24, marginTop: 22 }}>
-        <aside className="card" style={{ padding: 8, height: 'fit-content' }}>
+      {/* Mobile: horizontal scroll pills; Desktop: side nav */}
+      <div className="settings-pills scroll-pills" style={{ marginTop: 16, display: 'none', gap: 8 }}>
+        {SECTIONS.map(s => (
+          <button
+            key={s.id}
+            onClick={() => setTab(s.id)}
+            className={`tab${tab === s.id ? ' tab--active' : ''}`}
+            style={{ gap: 6, padding: '8px 14px', minHeight: 40 }}
+          >
+            <Icon name={s.icon} size={14} />{s.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="settings-layout" style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 24, marginTop: 22 }}>
+        <aside className="card settings-sidenav" style={{ padding: 8, height: 'fit-content' }}>
           {SECTIONS.map(s => (
             <button
               key={s.id}
@@ -155,6 +169,9 @@ function AccountSettings() {
   const [localBannerColor, setLocalBannerColor] = useState<string | null>(null);
   // Warn when Save Changes is clicked while there are unsaved link edits.
   const [linksConflict, setLinksConflict] = useState(false);
+  // Sessions state declared here so useEffect below can reference setSessions.
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
 
   useEffect(() => {
     profileApi.getMe().then(p => {
@@ -165,7 +182,6 @@ function AccountSettings() {
       setLocalBannerColor(p.bannerFallbackColor);
     }).catch(() => {/* non-fatal during initial load */});
     profileApi.getUsernameChangeRequest().then(r => setUsernameRequest(r)).catch(() => {});
-    // Load sessions on mount so they're visible immediately.
     accountApi.getSessions().then(setSessions).catch(() => {});
   }, []);
 
@@ -211,9 +227,6 @@ function AccountSettings() {
       setEmailLoading(false);
     }
   };
-
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [sessionsLoading, setSessionsLoading] = useState(false);
 
   const loadSessions = useCallback(async () => {
     setSessionsLoading(true);

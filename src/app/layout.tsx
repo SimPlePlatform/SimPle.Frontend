@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
@@ -14,24 +14,32 @@ export const metadata: Metadata = {
   description: 'A premium social gaming platform. Play sharp little games with friends, climb leaderboards, and build your profile.',
 };
 
-// Inline script runs before React hydrates to set data-theme on <html>
-// without a flash. Must be a dangerouslySetInnerHTML script in the <head>.
-const themeBootScript = `(function(){try{var s=localStorage.getItem('simple.theme');if(!s){s=(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches)?'light':'dark';}document.documentElement.setAttribute('data-theme',s);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();`;
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: [
+    { media: '(prefers-color-scheme: dark)',  color: '#0A0E18' },
+    { media: '(prefers-color-scheme: light)', color: '#F7F8FC' },
+  ],
+};
+
+// Runs before React hydrates — sets data-theme with no flash.
+// Default is always "dark"; only changes if user has an explicit saved choice.
+const themeBootScript = `(function(){try{var s=localStorage.getItem('simple.theme');document.documentElement.setAttribute('data-theme',s||'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
+    // suppressHydrationWarning: data-theme is set client-side by the boot
+    // script, so the server render won't match. React is told to ignore it.
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
       <head>
-        {/* Sets data-theme before React renders — prevents flash of wrong theme */}
-        <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
+        {/* suppressHydrationWarning on the script silences the Chrome extension
+            src-attribute injection that triggers the hydration mismatch. */}
+        <script dangerouslySetInnerHTML={{ __html: themeBootScript }} suppressHydrationWarning />
       </head>
       <body>
-        {/* Google Identity Services — loaded once for the whole app */}
-        <Script
-          id="google-gis"
-          src="https://accounts.google.com/gsi/client"
-          strategy="lazyOnload"
-        />
+        <Script id="google-gis" src="https://accounts.google.com/gsi/client" strategy="lazyOnload" />
         <ThemeProvider>
           <ToastProvider>
             <AuthProvider>{children}</AuthProvider>

@@ -186,7 +186,7 @@ export function ProfilePage({ userId }: { userId: string }) {
   return (
     <div className="page">
       <div className="card-elev" style={{ overflow: 'hidden', padding: 0 }}>
-        <div style={{ height: 160, position: 'relative', background: profile.bannerUrl ? `url(${profile.bannerUrl}) center/cover` : `linear-gradient(135deg, ${localBannerColor ?? profile.bannerFallbackColor} 0%, #1B2238 55%, #0B0F18 100%)` }}>
+        <div style={{ height: 'clamp(96px, 28vw, 160px)', position: 'relative', background: profile.bannerUrl ? `url(${profile.bannerUrl}) center/cover` : `linear-gradient(135deg, ${localBannerColor ?? profile.bannerFallbackColor} 0%, #1B2238 55%, #0B0F18 100%)` }}>
           <div className="grid-bg" style={{ opacity: 0.5 }} />
           {isOwn && (
             <div style={{ position: 'absolute', top: 14, right: editing ? 170 : 14 }}>
