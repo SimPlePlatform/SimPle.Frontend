@@ -11,7 +11,7 @@ export const CURRENT_USER: User = {
   xpToNext: 8000,
   rank: 'Diamond III',
   elo: 1842,
-  region: 'EU-West',
+  region: '',
   joined: 'Mar 2024',
   bio: 'CS @ TU Delft. Building games, chasing ELO.',
   status: 'online',

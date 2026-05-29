@@ -28,11 +28,12 @@ const SAMPLE_PROFILE = {
   hasUploadedAvatar: false,
   hasUploadedBanner: false,
   statusMessage: null,
-  region: 'EU-West',
+  region: '',
   color: '#F0394B',
+  bannerFallbackColor: '#0F1422',
   initials: 'TU',
   visibility: 'Public',
-  profileType: 'Gamer',
+  profileType: 'Player',
   role: 'Player',
   level: 1,
   elo: 1200,
@@ -228,5 +229,111 @@ describe('profileApi', () => {
       expect.objectContaining({ method: 'PUT', body: expect.stringContaining('#3366AA') }),
     );
     expect(result.color).toBe('#3366AA');
+  });
+
+  it('updateBannerFallback calls fallback endpoint', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200, json: () => Promise.resolve({ ...SAMPLE_PROFILE, bannerFallbackColor: '#123456' }) });
+    const { profileApi } = await import('@/features/profile/profileApi');
+    const result = await profileApi.updateBannerFallback('#123456');
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/profile/me/banner/fallback'),
+      expect.objectContaining({ method: 'PUT', body: expect.stringContaining('#123456') }),
+    );
+    expect(result.bannerFallbackColor).toBe('#123456');
+  });
+
+  it('updateUsername returns immediate or request result', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ appliedImmediately: true, message: 'Username changed.', request: null }),
+    });
+    const { profileApi } = await import('@/features/profile/profileApi');
+    const result = await profileApi.updateUsername('newhandle');
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/profile/me/username'),
+      expect.objectContaining({ method: 'PUT', body: expect.stringContaining('newhandle') }),
+    );
+    expect(result.appliedImmediately).toBe(true);
+  });
+
+  it('cancelUsernameChangeRequest calls DELETE endpoint', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({
+        id: 'r-1',
+        requestedUsername: 'nextname',
+        status: 'Cancelled',
+        rejectionReason: null,
+        requestYear: 2026,
+        requestMonth: 5,
+        createdAt: '2026-05-01T00:00:00Z',
+        updatedAt: '2026-05-01T00:00:00Z',
+        cancelledAt: '2026-05-01T00:01:00Z',
+        reviewedAt: null,
+        canEdit: false,
+        canCancel: false,
+      }),
+    });
+    const { profileApi } = await import('@/features/profile/profileApi');
+    const result = await profileApi.cancelUsernameChangeRequest();
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/profile/me/username-change-request'),
+      expect.objectContaining({ method: 'DELETE' }),
+    );
+    expect(result.status).toBe('Cancelled');
+  });
+});
+
+describe('UpdateProfileRequest security contract', () => {
+  it('does not include avatarUrl or bannerUrl fields', () => {
+    // These fields were removed from UpdateProfileRequest to prevent bypassing
+    // the presigned upload flow with arbitrary external URLs.
+    const request = {
+      displayName: 'Test',
+      bio: null,
+      region: null,
+      statusMessage: null,
+      visibility: 'Public' as const,
+      profileType: 'Player' as const,
+    };
+    expect(Object.keys(request)).not.toContain('avatarUrl');
+    expect(Object.keys(request)).not.toContain('bannerUrl');
+  });
+
+  it('updateMe does not send avatarUrl or bannerUrl to the API', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200, json: () => Promise.resolve(SAMPLE_PROFILE) });
+    const { profileApi } = await import('@/features/profile/profileApi');
+    await profileApi.updateMe({ displayName: 'Test', visibility: 'Public' });
+    const body = String(mockFetch.mock.calls[0][1].body);
+    expect(body).not.toContain('avatarUrl');
+    expect(body).not.toContain('bannerUrl');
+  });
+});
+
+describe('profileApi upload security', () => {
+  it('uploadAvatar rejects non-image types before hitting the API', async () => {
+    const { profileApi } = await import('@/features/profile/profileApi');
+    const file = new File(['data'], 'file.svg', { type: 'image/svg+xml' });
+    await expect(profileApi.uploadAvatar(file)).rejects.toThrow();
+    // fetch should not have been called — rejection happens client-side
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('uploadAvatar rejects files over 5 MB', async () => {
+    const { profileApi } = await import('@/features/profile/profileApi');
+    const largeContent = new Uint8Array(5 * 1024 * 1024 + 1);
+    const file = new File([largeContent], 'big.png', { type: 'image/png' });
+    await expect(profileApi.uploadAvatar(file)).rejects.toThrow('5 MB');
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('uploadBanner rejects files over 10 MB', async () => {
+    const { profileApi } = await import('@/features/profile/profileApi');
+    const largeContent = new Uint8Array(10 * 1024 * 1024 + 1);
+    const file = new File([largeContent], 'big.webp', { type: 'image/webp' });
+    await expect(profileApi.uploadBanner(file)).rejects.toThrow('10 MB');
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 });

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
@@ -28,12 +28,12 @@ export function LobbyPage({ lobbyId }: { lobbyId: string }) {
   ]);
   const [aiFill, setAiFill] = useState(false);
   const [privacy, setPrivacy] = useState('private');
-  const [timeMode, setTimeMode] = useState('Blitz · 3+2');
+  const [timeMode, setTimeMode] = useState('Blitz Â· 3+2');
   const [chat, setChat] = useState<ChatMessage[]>(DEFAULT_LOBBY_CHAT);
 
   const slotsWithAi = slots.map(s =>
     s.kind === 'empty' && aiFill
-      ? { kind: 'ai' as const, user: { initials: 'AI', color: '#A78BFA', display: `AI · ${game.aiLevels[1]}` }, ready: true }
+      ? { kind: 'ai' as const, user: { initials: 'AI', color: '#A78BFA', display: `AI Â· ${game.aiLevels[1]}` }, ready: true }
       : s
   );
   const allReady = slotsWithAi.every(s => s.kind === 'empty' || s.ready);
@@ -56,8 +56,8 @@ export function LobbyPage({ lobbyId }: { lobbyId: string }) {
             <span className="chip chip--mono">{privacy === 'private' ? 'Private' : 'Public'}</span>
             <span className="chip chip--mono">{timeMode}</span>
           </div>
-          <div className="page-title" style={{ marginTop: 10 }}>{game.name} · Lobby</div>
-          <div className="page-sub">Hosted by you · region EU-West · est. start in 30s</div>
+          <div className="page-title" style={{ marginTop: 10 }}>{game.name} Â· Lobby</div>
+          <div className="page-sub">Hosted by you Â· region Auto Â· est. start in 30s</div>
         </div>
         <div className="row" style={{ gap: 8 }}>
           <button
@@ -80,7 +80,7 @@ export function LobbyPage({ lobbyId }: { lobbyId: string }) {
             <div className="row between">
               <div>
                 <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}>
-                  Players · {slotsWithAi.filter(s => s.kind !== 'empty').length} / {slots.length}
+                  Players Â· {slotsWithAi.filter(s => s.kind !== 'empty').length} / {slots.length}
                 </div>
                 <div className="page-sub">Host can kick or promote.</div>
               </div>
@@ -97,13 +97,13 @@ export function LobbyPage({ lobbyId }: { lobbyId: string }) {
             <div className="row between" style={{ marginTop: 18 }}>
               <div className="row" style={{ gap: 8 }}>
                 <Toggle on={aiFill} onChange={setAiFill} label="Fill empty seats with AI" />
-                <span className="chip chip--mono">AI · {game.aiLevels[1]}</span>
+                <span className="chip chip--mono">AI Â· {game.aiLevels[1]}</span>
               </div>
               <div className="row" style={{ gap: 8 }}>
                 {allReady ? (
                   <Button size="lg" icon="play" onClick={() => router.push(ROUTES.room(lobbyId))}>Start match</Button>
                 ) : (
-                  <Button size="lg" disabled icon="clock">Waiting for ready…</Button>
+                  <Button size="lg" disabled icon="clock">Waiting for readyâ€¦</Button>
                 )}
               </div>
             </div>
@@ -112,10 +112,10 @@ export function LobbyPage({ lobbyId }: { lobbyId: string }) {
           <div className="card" style={{ padding: 18 }}>
             <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}>Match settings</div>
             <div className="grid grid-3" style={{ marginTop: 12 }}>
-              <SettingDropdown label="Time control" value={timeMode} options={['Bullet · 1+0', 'Blitz · 3+2', 'Rapid · 10+5', 'Classic · 30+30']} onChange={setTimeMode} />
+              <SettingDropdown label="Time control" value={timeMode} options={['Bullet Â· 1+0', 'Blitz Â· 3+2', 'Rapid Â· 10+5', 'Classic Â· 30+30']} onChange={setTimeMode} />
               <SettingDropdown label="Privacy" value={privacy === 'private' ? 'Private (link)' : 'Public'} options={['Private (link)', 'Public']} onChange={v => setPrivacy(v === 'Private (link)' ? 'private' : 'public')} />
               <SettingDropdown label="Rated" value="Ranked" options={['Ranked', 'Casual']} />
-              <SettingDropdown label="Region" value="EU-West (Frankfurt)" options={['EU-West (Frankfurt)', 'NA-East', 'Asia-SEA']} />
+              <SettingDropdown label="Region" value="Auto" options={['Auto', 'NA-East', 'Asia-SEA']} />
               <SettingDropdown label="Tie-break" value="Sudden death" options={['Sudden death', 'Bullet round']} />
               <SettingDropdown label="Spectators" value="Friends only" options={['Anyone', 'Friends only', 'Disabled']} />
             </div>
@@ -139,7 +139,7 @@ function SlotCard({ slot, seat }: { slot: LobbySlot; seat: number }) {
           <Icon name="plus" size={16} />
         </div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-md)' }}>Seat {seat} · Empty</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-md)' }}>Seat {seat} Â· Empty</div>
           <div className="mono" style={{ fontSize: 11, color: 'var(--text-lo)' }}>Invite a friend or fill with AI</div>
         </div>
         <Button size="sm" variant="ghost" icon="plus">Invite</Button>
@@ -157,7 +157,7 @@ function SlotCard({ slot, seat }: { slot: LobbySlot; seat: number }) {
           {slot.kind === 'host' && <span className="chip chip--red chip--mono"><Icon name="crown" size={11} /> Host</span>}
           {isAi && <span className="chip chip--mono"><Icon name="ai" size={11} /> AI</span>}
         </div>
-        <div className="mono" style={{ fontSize: 11, color: 'var(--text-lo)' }}>{isAi ? 'Difficulty: Hard' : `Seat ${seat} · EU-West`}</div>
+        <div className="mono" style={{ fontSize: 11, color: 'var(--text-lo)' }}>{isAi ? 'Difficulty: Hard' : `Seat ${seat} Â· Auto`}</div>
       </div>
       <div className="row" style={{ gap: 6 }}>
         <span className={`chip ${slot.ready ? 'chip--success' : 'chip--warn'}`}>
