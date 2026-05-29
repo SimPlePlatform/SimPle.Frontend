@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { ToastProvider } from '@/components/ui/Toast';
 import { AuthProvider } from '@/features/auth/AuthProvider';
+import { ThemeProvider } from '@/lib/theme';
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] });
@@ -13,9 +14,17 @@ export const metadata: Metadata = {
   description: 'A premium social gaming platform. Play sharp little games with friends, climb leaderboards, and build your profile.',
 };
 
+// Inline script runs before React hydrates to set data-theme on <html>
+// without a flash. Must be a dangerouslySetInnerHTML script in the <head>.
+const themeBootScript = `(function(){try{var s=localStorage.getItem('simple.theme');if(!s){s=(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches)?'light':'dark';}document.documentElement.setAttribute('data-theme',s);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
+      <head>
+        {/* Sets data-theme before React renders — prevents flash of wrong theme */}
+        <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
+      </head>
       <body>
         {/* Google Identity Services — loaded once for the whole app */}
         <Script
@@ -23,9 +32,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           src="https://accounts.google.com/gsi/client"
           strategy="lazyOnload"
         />
-        <ToastProvider>
-          <AuthProvider>{children}</AuthProvider>
-        </ToastProvider>
+        <ThemeProvider>
+          <ToastProvider>
+            <AuthProvider>{children}</AuthProvider>
+          </ToastProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

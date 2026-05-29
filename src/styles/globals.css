@@ -466,3 +466,130 @@ button { font: inherit; cursor: pointer; border: none; background: none; }
 
 .hide-scroll::-webkit-scrollbar { display: none; }
 .hide-scroll { scrollbar-width: none; }
+
+/* =========================================================================
+   LIGHT THEME — activated via [data-theme="light"] on <html>
+   ========================================================================= */
+[data-theme="light"] {
+  --bg-0: #EEF1F8;
+  --bg-1: #F7F8FC;
+  --bg-2: #FFFFFF;
+  --bg-3: #F4F6FB;
+  --bg-4: #EAEFF7;
+  --bg-tint: #F0F3F9;
+
+  --border-1: #ECEFF6;
+  --border-2: #DEE3EF;
+  --border-3: #C7CEDD;
+  --border-focus: rgba(214,33,51,0.55);
+
+  --text-hi: #0A0E18;
+  --text-md: #404A66;
+  --text-lo: #6E7790;
+  --text-dim: #99A0B6;
+
+  --red-300: #FF7884;
+  --red-400: #E5374A;
+  --red-500: #D62133;
+  --red-600: #B11625;
+  --red-700: #8B0F1B;
+  --red-glow: rgba(214,33,51,0.20);
+  --red-soft: rgba(214,33,51,0.08);
+
+  --ice-300: #38BDF8;
+  --ice-400: #0284C7;
+  --ice-500: #0369A1;
+  --violet-400: #7C3AED;
+
+  --success: #059669;
+  --warning: #B45309;
+  --danger:  #DC2626;
+  --info:    #0284C7;
+
+  --presence-online:  #10B981;
+  --presence-away:    #D97706;
+  --presence-playing: #DC2626;
+  --presence-offline: #94A3B8;
+
+  --shadow-1: 0 1px 0 rgba(255,255,255,1) inset, 0 1px 2px rgba(15,20,34,0.06);
+  --shadow-2: 0 1px 0 rgba(255,255,255,1) inset, 0 4px 16px rgba(15,20,34,0.07);
+  --shadow-3: 0 1px 0 rgba(255,255,255,1) inset, 0 16px 40px rgba(15,20,34,0.10);
+  --shadow-red: 0 0 0 1px rgba(214,33,51,0.35), 0 10px 30px rgba(214,33,51,0.20);
+}
+
+[data-theme="light"] body { background: var(--bg-1); color: var(--text-hi); }
+
+[data-theme="light"] .app {
+  background:
+    radial-gradient(1200px 600px at -10% -20%, rgba(214,33,51,0.05), transparent 60%),
+    radial-gradient(900px 500px at 110% 10%, rgba(56,189,248,0.05), transparent 60%),
+    var(--bg-1);
+}
+
+[data-theme="light"] .sidebar {
+  background: linear-gradient(180deg, #FCFCFE 0%, #F2F4FB 100%);
+  border-right-color: var(--border-1);
+}
+
+[data-theme="light"] .topbar,
+[data-theme="light"] .bottomnav {
+  background: rgba(255,255,255,0.78);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+
+[data-theme="light"] .grid-bg {
+  background-image:
+    linear-gradient(rgba(15,20,34,0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15,20,34,0.045) 1px, transparent 1px);
+}
+
+[data-theme="light"] .skel {
+  background: linear-gradient(90deg, #EEF1F8 0%, #E2E7F2 50%, #EEF1F8 100%);
+  background-size: 200% 100%;
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: var(--border-3);
+  border: 2px solid var(--bg-1);
+}
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+[data-theme="light"] .btn-primary {
+  box-shadow: 0 1px 0 rgba(255,255,255,0.28) inset, 0 6px 18px rgba(214,33,51,0.30);
+}
+[data-theme="light"] .btn-secondary { background: var(--bg-2); }
+[data-theme="light"] .btn-secondary:hover { background: var(--bg-3); }
+
+[data-theme="light"] .surface { background: var(--bg-2); }
+[data-theme="light"] .card,
+[data-theme="light"] .card-elev { background: var(--bg-2); }
+[data-theme="light"] .card-elev { box-shadow: var(--shadow-2); }
+
+[data-theme="light"] .tabs { background: var(--bg-3); border-color: var(--border-2); }
+[data-theme="light"] .tab--active {
+  background: var(--bg-2);
+  box-shadow: 0 1px 2px rgba(15,20,34,0.06);
+}
+
+[data-theme="light"] .input { background: var(--bg-2); }
+[data-theme="light"] .input:focus {
+  background: #FFFFFF;
+  box-shadow: 0 0 0 4px rgba(214,33,51,0.10);
+}
+
+[data-theme="light"] .bar { background: var(--bg-4); }
+
+[data-theme="light"] .landing {
+  background:
+    radial-gradient(900px 600px at 80% -10%, rgba(214,33,51,0.08), transparent 60%),
+    radial-gradient(800px 500px at 0% 100%, rgba(56,189,248,0.06), transparent 60%),
+    var(--bg-1);
+}
+
+[data-theme="light"] .chip--red { color: var(--red-600); }
+[data-theme="light"] .chip--ice { color: var(--ice-500); }
+[data-theme="light"] .chip--success { color: var(--success); }
+[data-theme="light"] .chip--warn { color: var(--warning); }
+
+[data-theme="light"] :focus-visible { outline-color: var(--border-focus); }
