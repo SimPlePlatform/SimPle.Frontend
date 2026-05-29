@@ -6,8 +6,8 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Icon } from '@/components/ui/Icons';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useToast } from '@/components/ui/Toast';
-import { FRIENDS } from '@/mock/friends';
 import { GAMES } from '@/mock/games';
+import { friendsApi, type FriendUserSummary } from '@/features/friends/friendsApi';
 
 interface Props {
   open: boolean;
@@ -20,6 +20,8 @@ export function InviteFriendModal({ open, onClose, preselectedGameId }: Props) {
   const [q, setQ] = useState('');
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [game, setGame] = useState(preselectedGameId ?? GAMES[3].id);
+  const [friends, setFriends] = useState<FriendUserSummary[]>([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -28,10 +30,16 @@ export function InviteFriendModal({ open, onClose, preselectedGameId }: Props) {
     setPicked(new Set());
     setQ('');
     if (preselectedGameId) setGame(preselectedGameId);
+    setLoading(true);
+    friendsApi.list()
+      .then(setFriends)
+      .catch(() => setFriends([]))
+      .finally(() => setLoading(false));
   }, [open, preselectedGameId]);
 
-  const online = FRIENDS.filter(f => f.status !== 'offline');
-  const friends = online.filter(f => !q || f.display.toLowerCase().includes(q.toLowerCase()));
+  const filteredFriends = friends.filter(f =>
+    !q || f.displayName.toLowerCase().includes(q.toLowerCase()) || f.username.toLowerCase().includes(q.toLowerCase())
+  );
   const toggle = (id: string) => setPicked(p => {
     const next = new Set(p);
     if (next.has(id)) { next.delete(id); } else { next.add(id); }
@@ -40,7 +48,7 @@ export function InviteFriendModal({ open, onClose, preselectedGameId }: Props) {
 
   const send = () => {
     const g = GAMES.find(x => x.id === game);
-    toast.push({ kind:'success', title:`Invite sent to ${picked.size} friend${picked.size===1?'':'s'}`, body:`${g?.name} · lobby SP-7F-29` });
+    toast.push({ kind:'success', title:`Invite selected for ${picked.size} friend${picked.size===1?'':'s'}`, body:`${g?.name} - lobby invite delivery is planned for a later module.` });
     onClose();
   };
 
@@ -72,27 +80,29 @@ export function InviteFriendModal({ open, onClose, preselectedGameId }: Props) {
 
         <label style={{ display:'block' }}>
           <div className="row between" style={{ marginBottom:6 }}>
-            <span className="label">Friends online · {friends.length}</span>
+            <span className="label">Friends - {filteredFriends.length}</span>
           </div>
           <div style={{ position:'relative' }}>
             <Icon name="search" size={14} style={{ position:'absolute', left:10, top:11, color:'var(--text-lo)' }} />
-            <input className="input" placeholder="Search by name…" value={q} onChange={e => setQ(e.target.value)} style={{ paddingLeft:32 }} />
+            <input className="input" placeholder="Search by name..." value={q} onChange={e => setQ(e.target.value)} style={{ paddingLeft:32 }} />
           </div>
         </label>
 
         <div style={{ maxHeight:280, overflow:'auto', borderRadius:10, border:'1px solid var(--border-1)' }}>
-          {friends.length === 0 ? (
-            <EmptyState icon="users" title="Nobody online." body="Try inviting via shareable link instead." />
-          ) : friends.map(f => {
-            const on = picked.has(f.id);
+          {loading ? (
+            <EmptyState icon="users" title="Loading friends..." body="Fetching your friend list." />
+          ) : filteredFriends.length === 0 ? (
+            <EmptyState icon="users" title="No friends found." body="Try inviting via shareable link instead." />
+          ) : filteredFriends.map(f => {
+            const on = picked.has(f.userId);
             return (
-              <button key={f.id} onClick={() => toggle(f.id)} className="row mobile-wrap" style={{ width:'100%', padding:'10px 12px', borderBottom:'1px solid var(--border-1)', background: on ? 'var(--red-soft)' : 'transparent', gap:12, textAlign:'left' }}>
-                <Avatar user={f} showPresence size="sm" />
+              <button key={f.userId} onClick={() => toggle(f.userId)} className="row mobile-wrap" style={{ width:'100%', padding:'10px 12px', borderBottom:'1px solid var(--border-1)', background: on ? 'var(--red-soft)' : 'transparent', gap:12, textAlign:'left' }}>
+                <Avatar user={{ initials: f.initials, color: f.avatarFallbackColor }} src={f.avatarUrl} size="sm" />
                 <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:13, fontWeight:600 }}>{f.display}</div>
-                  <div className="mono" style={{ fontSize:11, color:'var(--text-lo)' }}>{f.activity}</div>
+                  <div style={{ fontSize:13, fontWeight:600 }}>{f.displayName}</div>
+                  <div className="mono" style={{ fontSize:11, color:'var(--text-lo)' }}>@{f.username}</div>
                 </div>
-                <span className="chip chip--mono" style={{ height:22 }}>{f.elo}</span>
+                <span className="chip chip--mono" style={{ height:22 }}>{f.profileType}</span>
                 <span style={{ width:18, height:18, borderRadius:5, background: on ? 'var(--red-500)' : 'transparent', border:`1.5px solid ${on ? 'var(--red-500)' : 'var(--border-3)'}`, display:'grid', placeItems:'center' }}>
                   {on && <Icon name="check" size={12} style={{ color:'#fff' }} />}
                 </span>

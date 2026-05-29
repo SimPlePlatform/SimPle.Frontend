@@ -1,37 +1,113 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
 import { Icon } from '@/components/ui/Icons';
 import { Tabs } from '@/components/ui/Tabs';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useToast } from '@/components/ui/Toast';
-import { FRIENDS, FRIEND_REQUESTS, SUGGESTED } from '@/mock/friends';
-import type { Friend } from '@/types';
+import { ApiError } from '@/lib/api-client';
+import { friendsApi, type BlockedUser, type FriendRequest, type FriendUserSummary } from '@/features/friends/friendsApi';
+
+function avatarFor(user: FriendUserSummary) {
+  return { initials: user.initials, color: user.avatarFallbackColor, status: 'offline' };
+}
+
+function displayError(error: unknown, fallback: string) {
+  return error instanceof ApiError ? error.message : fallback;
+}
 
 export function FriendsPage() {
   const toast = useToast();
   const [tab, setTab] = useState('all');
   const [q, setQ] = useState('');
-  const [showEmpty, setShowEmpty] = useState(false);
+  const [friends, setFriends] = useState<FriendUserSummary[]>([]);
+  const [incoming, setIncoming] = useState<FriendRequest[]>([]);
+  const [outgoing, setOutgoing] = useState<FriendRequest[]>([]);
+  const [suggestions, setSuggestions] = useState<FriendUserSummary[]>([]);
+  const [blocked, setBlocked] = useState<BlockedUser[]>([]);
+  const [searchResults, setSearchResults] = useState<FriendUserSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const filtered = FRIENDS.filter(f => !q || f.display.toLowerCase().includes(q.toLowerCase()));
-  const online = filtered.filter(f => f.status !== 'offline');
+  const load = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [friendList, requests, suggested, blocks] = await Promise.all([
+        friendsApi.list(),
+        friendsApi.requests(),
+        friendsApi.suggestions(),
+        friendsApi.blocks(),
+      ]);
+      setFriends(friendList);
+      setIncoming(requests.incoming);
+      setOutgoing(requests.outgoing);
+      setSuggestions(suggested);
+      setBlocked(blocks);
+    } catch (e) {
+      setError(displayError(e, 'Could not load friends.'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void Promise.resolve().then(load);
+  }, []);
+
+  useEffect(() => {
+    const query = q.trim();
+    let cancelled = false;
+    const id = window.setTimeout(() => {
+      if (query.length < 2) {
+        setSearchResults([]);
+        return;
+      }
+      friendsApi.search(query)
+        .then(results => { if (!cancelled) setSearchResults(results); })
+        .catch(() => { if (!cancelled) setSearchResults([]); });
+    }, query.length < 2 ? 0 : 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(id);
+    };
+  }, [q]);
+
+  const run = async (key: string, action: () => Promise<unknown>, success: string) => {
+    setActionLoading(key);
+    try {
+      await action();
+      toast.push({ kind: 'success', title: success });
+      await load();
+    } catch (e) {
+      toast.push({ kind: 'default', title: displayError(e, 'Action failed.') });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const filtered = useMemo(() => {
+    const query = q.trim().toLowerCase();
+    if (!query) return friends;
+    return friends.filter(f =>
+      f.displayName.toLowerCase().includes(query) || f.username.toLowerCase().includes(query)
+    );
+  }, [friends, q]);
+  const visibleSearch = q.trim().length >= 2 ? searchResults : [];
 
   return (
     <div className="page">
       <div className="between" style={{ flexWrap: 'wrap', gap: 12 }}>
         <div>
           <div className="page-title">Friends</div>
-          <div className="page-sub">{FRIENDS.length} total · {online.length} online · {FRIEND_REQUESTS.length} pending requests</div>
+          <div className="page-sub">
+            {friends.length} total - {incoming.length} incoming - {outgoing.length} sent
+          </div>
         </div>
         <div className="row mobile-actions" style={{ gap: 8 }}>
-          <Button variant="ghost" icon="share">Share invite link</Button>
-          <Button
-            icon="plus"
-            onClick={() => toast.push({ kind: 'info', title: 'Friend request sent', body: 'Yuki Tanaka will be notified.' })}
-          >Add friend</Button>
+          <Button variant="ghost" icon="refresh" onClick={() => void load()} disabled={loading}>Refresh</Button>
         </div>
       </div>
 
@@ -40,13 +116,13 @@ export function FriendsPage() {
           value={tab}
           onChange={setTab}
           items={[
-            { value: 'all',      label: 'All friends',  count: FRIENDS.length },
-            { value: 'online',   label: 'Online',       count: online.length },
-            { value: 'requests', label: 'Requests',     count: FRIEND_REQUESTS.length, icon: 'bell' },
-            { value: 'suggest',  label: 'Suggestions',  count: SUGGESTED.length, icon: 'sparkle' },
+            { value: 'all', label: 'All friends', count: friends.length },
+            { value: 'requests', label: 'Requests', count: incoming.length + outgoing.length, icon: 'bell' },
+            { value: 'suggest', label: 'Suggestions', count: suggestions.length, icon: 'sparkle' },
+            { value: 'blocked', label: 'Blocked', count: blocked.length, icon: 'shield' },
           ]}
         />
-        <div style={{ position: 'relative', width: 'min(100%, 260px)' }}>
+        <div style={{ position: 'relative', width: 'min(100%, 300px)' }}>
           <Icon name="search" size={15} style={{ position: 'absolute', left: 11, top: 11, color: 'var(--text-lo)' }} />
           <input
             className="input"
@@ -58,23 +134,57 @@ export function FriendsPage() {
         </div>
       </div>
 
+      {error && <div className="surface" style={{ marginTop: 14, padding: 12, color: 'var(--danger)' }}>{error}</div>}
+
       <div className="responsive-split" style={{ gridTemplateColumns: '2fr 1fr', marginTop: 22 }}>
         <div className="card" style={{ padding: 18 }}>
-          {tab === 'requests' ? <RequestsList /> :
-           tab === 'suggest'  ? <SuggestionsList /> :
-           showEmpty ? <EmptyFriends onAdd={() => setShowEmpty(false)} /> :
-           <FriendList list={tab === 'online' ? online : filtered} />}
-          {(tab === 'all' || tab === 'online') && (
-            <div className="row" style={{ marginTop: 14, gap: 8, justifyContent: 'center' }}>
-              <Button size="sm" variant="ghost" onClick={() => setShowEmpty(s => !s)}>
-                {showEmpty ? 'Show friends' : 'Preview empty state'}
-              </Button>
-            </div>
+          {loading ? (
+            <EmptyState icon="users" title="Loading friends..." body="Fetching your social graph." />
+          ) : visibleSearch.length > 0 ? (
+            <UserResults
+              users={visibleSearch}
+              actionLoading={actionLoading}
+              onSend={userId => run(`send-${userId}`, () => friendsApi.sendRequest(userId), 'Friend request sent.')}
+              onBlock={userId => run(`block-${userId}`, () => friendsApi.block(userId), 'User blocked.')}
+            />
+          ) : tab === 'requests' ? (
+            <RequestsList
+              incoming={incoming}
+              outgoing={outgoing}
+              actionLoading={actionLoading}
+              onAccept={id => run(`accept-${id}`, () => friendsApi.acceptRequest(id), 'Friend added.')}
+              onDecline={id => run(`decline-${id}`, () => friendsApi.declineRequest(id), 'Request declined.')}
+              onCancel={id => run(`cancel-${id}`, () => friendsApi.cancelRequest(id), 'Request cancelled.')}
+            />
+          ) : tab === 'suggest' ? (
+            <UserResults
+              users={suggestions}
+              actionLoading={actionLoading}
+              onSend={userId => run(`send-${userId}`, () => friendsApi.sendRequest(userId), 'Friend request sent.')}
+              onBlock={userId => run(`block-${userId}`, () => friendsApi.block(userId), 'User blocked.')}
+            />
+          ) : tab === 'blocked' ? (
+            <BlockedList
+              blocked={blocked}
+              actionLoading={actionLoading}
+              onUnblock={userId => run(`unblock-${userId}`, () => friendsApi.unblock(userId), 'User unblocked.')}
+            />
+          ) : (
+            <FriendList
+              friends={filtered}
+              actionLoading={actionLoading}
+              onRemove={userId => run(`remove-${userId}`, () => friendsApi.removeFriend(userId), 'Friend removed.')}
+              onBlock={userId => run(`block-${userId}`, () => friendsApi.block(userId), 'User blocked.')}
+            />
           )}
         </div>
 
         <div className="col" style={{ gap: 18 }}>
-          <SuggestedSidecar />
+          <SuggestedSidecar
+            suggestions={suggestions.slice(0, 5)}
+            actionLoading={actionLoading}
+            onSend={userId => run(`send-${userId}`, () => friendsApi.sendRequest(userId), 'Friend request sent.')}
+          />
           <FriendsActivity />
         </div>
       </div>
@@ -82,88 +192,157 @@ export function FriendsPage() {
   );
 }
 
-function FriendList({ list }: { list: Friend[] }) {
-  const toast = useToast();
-  if (!list.length) return <EmptyState icon="users" title="Nobody matches that." body="Try clearing the search or invite someone new." />;
+function FriendList({
+  friends,
+  actionLoading,
+  onRemove,
+  onBlock,
+}: {
+  friends: FriendUserSummary[];
+  actionLoading: string | null;
+  onRemove: (userId: string) => void;
+  onBlock: (userId: string) => void;
+}) {
+  if (!friends.length) return <EmptyState icon="users" title="No friends yet." body="Search for players or accept incoming requests to build your roster." />;
   return (
-    <div className="col" style={{ gap: 2 }}>
-      <div className="friends-header row" style={{ padding: '6px 10px' }}>
-        <div className="uppercase-label" style={{ flex: 1 }}>Player</div>
-        <div className="uppercase-label" style={{ width: 160 }}>Status</div>
-        <div className="uppercase-label" style={{ width: 80, textAlign: 'right' }}>ELO</div>
-        <div style={{ width: 170 }} />
+    <div className="col" style={{ gap: 8 }}>
+      {friends.map(f => (
+        <div key={f.userId} className="surface row mobile-wrap" style={{ padding: 14, gap: 12 }}>
+          <Avatar user={avatarFor(f)} src={f.avatarUrl} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13.5, fontWeight: 600 }}>{f.displayName}</div>
+            <div className="mono" style={{ fontSize: 11, color: 'var(--text-lo)' }}>@{f.username} - {f.profileType}</div>
+          </div>
+          <div className="row mobile-actions" style={{ gap: 6 }}>
+            <Button size="sm" variant="ghost" icon="x" disabled={actionLoading === `remove-${f.userId}`} onClick={() => onRemove(f.userId)}>Remove</Button>
+            <Button size="sm" variant="ghost" icon="shield" disabled={actionLoading === `block-${f.userId}`} onClick={() => onBlock(f.userId)}>Block</Button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function RequestsList({
+  incoming,
+  outgoing,
+  actionLoading,
+  onAccept,
+  onDecline,
+  onCancel,
+}: {
+  incoming: FriendRequest[];
+  outgoing: FriendRequest[];
+  actionLoading: string | null;
+  onAccept: (requestId: string) => void;
+  onDecline: (requestId: string) => void;
+  onCancel: (requestId: string) => void;
+}) {
+  if (!incoming.length && !outgoing.length) {
+    return <EmptyState icon="bell" title="No friend requests." body="Incoming and outgoing requests will appear here." />;
+  }
+  return (
+    <div className="col" style={{ gap: 14 }}>
+      {incoming.length > 0 && <div className="uppercase-label">Incoming</div>}
+      {incoming.map(r => (
+        <RequestRow key={r.id} user={r.sender} subtitle={`${r.sender.mutualFriendsCount} mutual friends`}>
+          <Button size="sm" icon="check" disabled={actionLoading === `accept-${r.id}`} onClick={() => onAccept(r.id)}>Accept</Button>
+          <Button size="sm" variant="ghost" icon="x" disabled={actionLoading === `decline-${r.id}`} onClick={() => onDecline(r.id)}>Decline</Button>
+        </RequestRow>
+      ))}
+      {outgoing.length > 0 && <div className="uppercase-label" style={{ marginTop: 4 }}>Outgoing</div>}
+      {outgoing.map(r => (
+        <RequestRow key={r.id} user={r.receiver} subtitle="Request sent">
+          <Button size="sm" variant="ghost" icon="x" disabled={actionLoading === `cancel-${r.id}`} onClick={() => onCancel(r.id)}>Cancel</Button>
+        </RequestRow>
+      ))}
+    </div>
+  );
+}
+
+function RequestRow({ user, subtitle, children }: { user: FriendUserSummary; subtitle: string; children: React.ReactNode }) {
+  return (
+    <div className="surface row mobile-wrap" style={{ padding: 14, gap: 12 }}>
+      <Avatar user={avatarFor(user)} src={user.avatarUrl} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13.5, fontWeight: 600 }}>{user.displayName}</div>
+        <div className="mono" style={{ fontSize: 11, color: 'var(--text-lo)' }}>{subtitle}</div>
       </div>
-      {list.map(f => (
-        <div key={f.id} className="friends-row row" style={{ padding: '10px', borderRadius: 10, gap: 12 }}>
-          <Avatar user={f} showPresence />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13.5, fontWeight: 600 }}>{f.display}</div>
-            <div className="mono" style={{ fontSize: 11, color: 'var(--text-lo)' }}>Lv {f.level}</div>
-          </div>
-          <div style={{ width: 160 }}>
-            <StatusBadge status={f.status} label={f.activity.length > 24 ? f.activity.slice(0, 22) + '…' : f.activity} />
-          </div>
-          <div className="mono" style={{ width: 80, textAlign: 'right', fontWeight: 600 }}>{f.elo}</div>
-          <div className="row" style={{ width: 170, justifyContent: 'flex-end', gap: 6 }}>
-            <Button size="sm" variant="ghost" icon="message" />
-            <Button
-              size="sm" variant="ghost" icon="plus"
-              onClick={() => toast.push({ kind: 'info', title: 'Invite sent', body: `${f.display} got a lobby invite.` })}
-            >Invite</Button>
-            <button className="btn btn-ghost btn-icon btn-sm"><Icon name="more" size={14} /></button>
-          </div>
-        </div>
-      ))}
+      <div className="row mobile-actions" style={{ gap: 6 }}>{children}</div>
     </div>
   );
 }
 
-function RequestsList() {
-  const toast = useToast();
+function UserResults({
+  users,
+  actionLoading,
+  onSend,
+  onBlock,
+}: {
+  users: FriendUserSummary[];
+  actionLoading: string | null;
+  onSend: (userId: string) => void;
+  onBlock: (userId: string) => void;
+}) {
+  if (!users.length) return <EmptyState icon="search" title="No players found." body="Try another username or display name." />;
   return (
     <div className="col" style={{ gap: 8 }}>
-      {FRIEND_REQUESTS.map(r => (
-        <div key={r.id} className="surface row mobile-wrap" style={{ padding: 14, gap: 12 }}>
-          <Avatar user={r} />
+      {users.map(user => (
+        <div key={user.userId} className="surface row mobile-wrap" style={{ padding: 14, gap: 12 }}>
+          <Avatar user={avatarFor(user)} src={user.avatarUrl} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13.5, fontWeight: 600 }}>{r.display}</div>
-            <div className="mono" style={{ fontSize: 11, color: 'var(--text-lo)' }}>{r.mutual} mutual friends</div>
+            <div style={{ fontSize: 13.5, fontWeight: 600 }}>{user.displayName}</div>
+            <div className="mono" style={{ fontSize: 11, color: 'var(--text-lo)' }}>
+              @{user.username} - {user.mutualFriendsCount} mutual - {user.friendshipStatus}
+            </div>
           </div>
-          <Button
-            size="sm" icon="check"
-            onClick={() => toast.push({ kind: 'success', title: 'Friend added', body: `${r.display} is now your friend.` })}
-          >Accept</Button>
-          <Button size="sm" variant="ghost" icon="x">Decline</Button>
+          <div className="row mobile-actions" style={{ gap: 6 }}>
+            {user.friendshipStatus === 'None' && (
+              <Button size="sm" icon="plus" disabled={actionLoading === `send-${user.userId}`} onClick={() => onSend(user.userId)}>Add</Button>
+            )}
+            <Button size="sm" variant="ghost" icon="shield" disabled={actionLoading === `block-${user.userId}`} onClick={() => onBlock(user.userId)}>Block</Button>
+          </div>
         </div>
       ))}
     </div>
   );
 }
 
-function SuggestionsList() {
-  const toast = useToast();
+function BlockedList({
+  blocked,
+  actionLoading,
+  onUnblock,
+}: {
+  blocked: BlockedUser[];
+  actionLoading: string | null;
+  onUnblock: (userId: string) => void;
+}) {
+  if (!blocked.length) return <EmptyState icon="shield" title="No blocked players." body="Blocked players are hidden from friend requests, search, and suggestions." />;
   return (
     <div className="col" style={{ gap: 8 }}>
-      {SUGGESTED.map(s => (
-        <div key={s.id} className="surface row mobile-wrap" style={{ padding: 14, gap: 12 }}>
-          <Avatar user={s} />
+      {blocked.map(item => (
+        <div key={item.userId} className="surface row mobile-wrap" style={{ padding: 14, gap: 12 }}>
+          <Avatar user={{ initials: item.initials, color: item.avatarFallbackColor }} src={item.avatarUrl} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13.5, fontWeight: 600 }}>{s.display}</div>
-            <div className="mono" style={{ fontSize: 11, color: 'var(--text-lo)' }}>{s.mutual} mutual · {s.elo} ELO</div>
+            <div style={{ fontSize: 13.5, fontWeight: 600 }}>{item.displayName}</div>
+            <div className="mono" style={{ fontSize: 11, color: 'var(--text-lo)' }}>@{item.username}</div>
           </div>
-          <Button
-            size="sm" variant="ghost" icon="plus"
-            onClick={() => toast.push({ kind: 'info', title: 'Request sent', body: `${s.display} will be notified.` })}
-          >Add</Button>
-          <Button size="sm" variant="ghost" icon="x" />
+          <Button size="sm" variant="ghost" disabled={actionLoading === `unblock-${item.userId}`} onClick={() => onUnblock(item.userId)}>Unblock</Button>
         </div>
       ))}
     </div>
   );
 }
 
-function SuggestedSidecar() {
-  const toast = useToast();
+function SuggestedSidecar({
+  suggestions,
+  actionLoading,
+  onSend,
+}: {
+  suggestions: FriendUserSummary[];
+  actionLoading: string | null;
+  onSend: (userId: string) => void;
+}) {
   return (
     <div className="card" style={{ padding: 18 }}>
       <div className="row between">
@@ -171,17 +350,16 @@ function SuggestedSidecar() {
         <Icon name="sparkle" size={14} style={{ color: 'var(--ice-400)' }} />
       </div>
       <div className="col" style={{ marginTop: 12, gap: 10 }}>
-        {SUGGESTED.map(s => (
-          <div key={s.id} className="row" style={{ gap: 10 }}>
-            <Avatar user={s} size="sm" />
+        {suggestions.length === 0 ? (
+          <div style={{ fontSize: 12, color: 'var(--text-lo)' }}>Suggestions will appear as your network grows.</div>
+        ) : suggestions.map(s => (
+          <div key={s.userId} className="row" style={{ gap: 10 }}>
+            <Avatar user={avatarFor(s)} src={s.avatarUrl} size="sm" />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12.5, fontWeight: 600 }}>{s.display}</div>
-              <div className="mono" style={{ fontSize: 11, color: 'var(--text-lo)' }}>{s.mutual} mutual</div>
+              <div style={{ fontSize: 12.5, fontWeight: 600 }}>{s.displayName}</div>
+              <div className="mono" style={{ fontSize: 11, color: 'var(--text-lo)' }}>{s.mutualFriendsCount} mutual</div>
             </div>
-            <Button
-              size="sm" variant="ghost" icon="plus"
-              onClick={() => toast.push({ kind: 'info', title: 'Request sent', body: `${s.display} will be notified.` })}
-            />
+            <Button size="sm" variant="ghost" icon="plus" disabled={actionLoading === `send-${s.userId}`} onClick={() => onSend(s.userId)} />
           </div>
         ))}
       </div>
@@ -190,42 +368,12 @@ function SuggestedSidecar() {
 }
 
 function FriendsActivity() {
-  const items = [
-    { when: 'now',  name: 'Priya',  text: 'opened a Chess Lite lobby',       color: '#38BDF8', initials: 'PR' },
-    { when: '3m',   name: 'Sara',   text: 'climbed to Master · +24 ELO',     color: '#34D399', initials: 'SL' },
-    { when: '12m',  name: 'Mateus', text: 'solved Sudoku Master in 4:21',    color: '#A78BFA', initials: 'MO' },
-    { when: '1h',   name: 'Noor',   text: 'hit 10-win streak in Connect Four', color: '#F472B6', initials: 'NA' },
-  ];
   return (
     <div className="card" style={{ padding: 18 }}>
       <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 14 }}>Friend activity</div>
-      <div className="col" style={{ marginTop: 12, gap: 12 }}>
-        {items.map((item, i) => (
-          <div key={i} className="row" style={{ gap: 10 }}>
-            <Avatar user={{ initials: item.initials, color: item.color }} size="sm" />
-            <div style={{ flex: 1, minWidth: 0, fontSize: 12.5 }}>
-              <div><b>{item.name}</b> <span style={{ color: 'var(--text-lo)' }}>{item.text}</span></div>
-              <div className="mono" style={{ fontSize: 11, color: 'var(--text-lo)' }}>{item.when}</div>
-            </div>
-          </div>
-        ))}
+      <div style={{ marginTop: 12, fontSize: 12.5, color: 'var(--text-lo)' }}>
+        Realtime presence and activity remain planned for later modules.
       </div>
     </div>
-  );
-}
-
-function EmptyFriends({ onAdd }: { onAdd: () => void }) {
-  return (
-    <EmptyState
-      icon="users"
-      title="Your roster is empty — let's fix that."
-      body="Add friends to invite them to lobbies, see when they're online, and climb leaderboards together."
-      action={
-        <div className="row mobile-actions" style={{ gap: 8, justifyContent: 'center' }}>
-          <Button icon="plus" onClick={onAdd}>Add a friend</Button>
-          <Button variant="ghost" icon="share">Copy invite link</Button>
-        </div>
-      }
-    />
   );
 }

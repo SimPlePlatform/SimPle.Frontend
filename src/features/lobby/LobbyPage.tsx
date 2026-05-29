@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
@@ -14,6 +14,7 @@ import { GAMES } from '@/mock/games';
 import { DEFAULT_LOBBY_CHAT } from '@/mock/lobbies';
 import { ROUTES } from '@/lib/routes';
 import type { LobbySlot, ChatMessage } from '@/types';
+import { friendsApi, type FriendUserSummary } from '@/features/friends/friendsApi';
 
 export function LobbyPage({ lobbyId }: { lobbyId: string }) {
   const router = useRouter();
@@ -203,13 +204,21 @@ function SettingDropdown({ label, value, options, onChange }: {
 function InviteFriendsPanel() {
   const toast = useToast();
   const [q, setQ] = useState('');
-  const list = FRIENDS.filter(f => f.status !== 'offline').filter(f => !q || f.display.toLowerCase().includes(q.toLowerCase()));
+  const [friends, setFriends] = useState<FriendUserSummary[]>([]);
+
+  useEffect(() => {
+    friendsApi.list().then(setFriends).catch(() => setFriends([]));
+  }, []);
+
+  const list = friends.filter(f =>
+    !q || f.displayName.toLowerCase().includes(q.toLowerCase()) || f.username.toLowerCase().includes(q.toLowerCase())
+  );
 
   return (
     <div className="card" style={{ padding: 18 }}>
       <div className="row between">
         <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 14 }}>Invite friends</div>
-        <span className="chip chip--mono">{list.length} online</span>
+        <span className="chip chip--mono">{list.length} friends</span>
       </div>
       <div style={{ position: 'relative', marginTop: 10 }}>
         <Icon name="search" size={14} style={{ position: 'absolute', left: 10, top: 11, color: 'var(--text-lo)' }} />
@@ -217,15 +226,15 @@ function InviteFriendsPanel() {
       </div>
       <div className="col" style={{ marginTop: 10, gap: 4, maxHeight: 280, overflow: 'auto' }}>
         {list.map(f => (
-          <div key={f.id} className="row mobile-wrap" style={{ padding: '8px 6px', borderRadius: 8, gap: 10 }}>
-            <Avatar user={f} size="sm" showPresence />
+          <div key={f.userId} className="row mobile-wrap" style={{ padding: '8px 6px', borderRadius: 8, gap: 10 }}>
+            <Avatar user={{ initials: f.initials, color: f.avatarFallbackColor }} src={f.avatarUrl} size="sm" />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12.5, fontWeight: 600 }}>{f.display}</div>
-              <div className="mono" style={{ fontSize: 11, color: 'var(--text-lo)' }}>{f.activity}</div>
+              <div style={{ fontSize: 12.5, fontWeight: 600 }}>{f.displayName}</div>
+              <div className="mono" style={{ fontSize: 11, color: 'var(--text-lo)' }}>@{f.username}</div>
             </div>
             <Button
               size="sm" variant="ghost" icon="send"
-              onClick={() => toast.push({ kind: 'info', title: 'Invite sent', body: `${f.display} got a lobby invite.` })}
+              onClick={() => toast.push({ kind: 'info', title: 'Invite selected', body: 'Lobby invite delivery is planned for a later module.' })}
             >Invite</Button>
           </div>
         ))}

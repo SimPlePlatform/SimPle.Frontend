@@ -1,20 +1,14 @@
 'use client';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Icon } from '@/components/ui/Icons';
 import { Avatar } from '@/components/ui/Avatar';
-import { FRIEND_REQUESTS } from '@/mock/friends';
 import { NOTIFICATIONS } from '@/mock/notifications';
 import { ROUTES } from '@/lib/routes';
 import { useAuth } from '@/features/auth/AuthProvider';
+import { friendsApi } from '@/features/friends/friendsApi';
 
-const NAV_PRIMARY = [
-  { href: ROUTES.dashboard, label: 'Dashboard', icon: 'home' },
-  { href: ROUTES.games, label: 'Game Library', icon: 'library' },
-  { href: ROUTES.friends, label: 'Friends', icon: 'users', badgeCount: FRIEND_REQUESTS.length },
-  { href: ROUTES.leaderboards, label: 'Leaderboards', icon: 'trophy' },
-];
 const NAV_SESSION = [
   { href: ROUTES.lobby('SP-7F-29'), label: 'Active Lobby', icon: 'controller' },
   { href: ROUTES.profile('me'), label: 'My Profile', icon: 'user' },
@@ -32,6 +26,14 @@ export function MobileNavDrawer({ open, onClose }: MobileNavDrawerProps) {
   const pathname = usePathname();
   const { user } = useAuth();
   const notifCount = NOTIFICATIONS.length;
+  const [requestCount, setRequestCount] = useState(0);
+
+  useEffect(() => {
+    if (!open) return;
+    friendsApi.incomingRequests()
+      .then(requests => setRequestCount(requests.length))
+      .catch(() => setRequestCount(0));
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -48,6 +50,12 @@ export function MobileNavDrawer({ open, onClose }: MobileNavDrawerProps) {
   if (!open) return null;
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
+  const navPrimary = [
+    { href: ROUTES.dashboard, label: 'Dashboard', icon: 'home' },
+    { href: ROUTES.games, label: 'Game Library', icon: 'library' },
+    { href: ROUTES.friends, label: 'Friends', icon: 'users', badgeCount: requestCount },
+    { href: ROUTES.leaderboards, label: 'Leaderboards', icon: 'trophy' },
+  ];
 
   return (
     <>
@@ -86,7 +94,7 @@ export function MobileNavDrawer({ open, onClose }: MobileNavDrawerProps) {
         </div>
 
         <nav className="mobile-drawer__nav">
-          <DrawerNavGroup label="Play" items={NAV_PRIMARY} isActive={isActive} />
+          <DrawerNavGroup label="Play" items={navPrimary} isActive={isActive} />
           <DrawerNavGroup label="Session" items={NAV_SESSION} isActive={isActive} />
           <DrawerNavGroup label="Account" items={NAV_META} isActive={isActive} />
         </nav>

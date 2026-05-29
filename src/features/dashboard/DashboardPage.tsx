@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
@@ -9,25 +9,38 @@ import { Icon } from '@/components/ui/Icons';
 import { CreateLobbyModal } from '@/components/lobby/CreateLobbyModal';
 import { InviteFriendModal } from '@/components/friends/InviteFriendModal';
 import { CURRENT_USER } from '@/mock/users';
-import { FRIENDS } from '@/mock/friends';
 import { GAMES } from '@/mock/games';
 import { RECENT_MATCHES } from '@/mock/matches';
 import { NOTIFICATIONS } from '@/mock/notifications';
 import { ROUTES } from '@/lib/routes';
+import { friendsApi, type FriendUserSummary } from '@/features/friends/friendsApi';
 
 export function DashboardPage() {
   const u = CURRENT_USER;
   const router = useRouter();
   const [lobbyOpen, setLobbyOpen]   = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
-  const onlineFriends = FRIENDS.filter(f => f.status === 'online' || f.status === 'playing');
+  const [friendCount, setFriendCount] = useState(0);
+  const [requestCount, setRequestCount] = useState(0);
+
+  useEffect(() => {
+    Promise.all([friendsApi.list(), friendsApi.incomingRequests()])
+      .then(([friends, requests]) => {
+        setFriendCount(friends.length);
+        setRequestCount(requests.length);
+      })
+      .catch(() => {
+        setFriendCount(0);
+        setRequestCount(0);
+      });
+  }, []);
 
   return (
     <div className="page">
       <div className="between" style={{ flexWrap:'wrap', gap:12 }}>
         <div>
           <div className="page-title">Good evening, {u.display.split(' ')[0]}.</div>
-          <div className="page-sub">{onlineFriends.length} friends online · {NOTIFICATIONS.filter(n => n.kind === 'invite').length} invite waiting</div>
+          <div className="page-sub">{friendCount} friends - {requestCount} pending requests - {NOTIFICATIONS.filter(n => n.kind === 'invite').length} invite waiting</div>
         </div>
         <div className="row mobile-actions" style={{ gap:8 }}>
           <Button variant="ghost" icon="ai" onClick={() => router.push(ROUTES.games)}>Play vs AI</Button>
@@ -220,26 +233,33 @@ function PendingInvitesCard() {
 
 function OnlineFriendsPanel() {
   const router = useRouter();
-  const online = FRIENDS.filter(f => f.status !== 'offline').slice(0, 5);
+  const [friends, setFriends] = useState<FriendUserSummary[]>([]);
+  useEffect(() => {
+    friendsApi.list().then(setFriends).catch(() => setFriends([]));
+  }, []);
+  const visible = friends.slice(0, 5);
   return (
     <div className="card" style={{ padding:18 }}>
       <div className="row between">
         <div>
-          <div style={{ fontFamily:'var(--font-display)', fontWeight:600, fontSize:14 }}>Friends online</div>
-          <div className="mono" style={{ fontSize:11, color:'var(--text-lo)' }}>{online.length} of {FRIENDS.length}</div>
+          <div style={{ fontFamily:'var(--font-display)', fontWeight:600, fontSize:14 }}>Friends</div>
+          <div className="mono" style={{ fontSize:11, color:'var(--text-lo)' }}>{visible.length} of {friends.length}</div>
         </div>
         <Button size="sm" variant="ghost" iconRight="chevronRight" onClick={() => router.push(ROUTES.friends)}>View all</Button>
       </div>
       <div className="col" style={{ marginTop:12, gap:6 }}>
-        {online.map(f => (
-          <div key={f.id} className="row mobile-wrap" style={{ padding:'10px 8px', borderRadius:10, gap:12 }}>
-            <Avatar user={f} showPresence />
+        {visible.length === 0 && (
+          <div style={{ fontSize: 12, color: 'var(--text-lo)' }}>Your friends will appear here.</div>
+        )}
+        {visible.map(f => (
+          <div key={f.userId} className="row mobile-wrap" style={{ padding:'10px 8px', borderRadius:10, gap:12 }}>
+            <Avatar user={{ initials: f.initials, color: f.avatarFallbackColor }} src={f.avatarUrl} />
             <div style={{ flex:1, minWidth:0 }}>
               <div className="row" style={{ gap:8 }}>
-                <span style={{ fontSize:13, fontWeight:600 }}>{f.display}</span>
-                <span className="chip chip--mono" style={{ height:18, padding:'0 6px', fontSize:10 }}>{f.elo}</span>
+                <span style={{ fontSize:13, fontWeight:600 }}>{f.displayName}</span>
+                <span className="chip chip--mono" style={{ height:18, padding:'0 6px', fontSize:10 }}>{f.profileType}</span>
               </div>
-              <div className="mono" style={{ fontSize:11, color:'var(--text-lo)' }}>{f.activity}</div>
+              <div className="mono" style={{ fontSize:11, color:'var(--text-lo)' }}>@{f.username}</div>
             </div>
             <Button size="sm" variant="ghost" icon="message" />
             <Button size="sm" variant="ghost" icon="plus">Invite</Button>
