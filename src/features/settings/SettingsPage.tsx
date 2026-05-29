@@ -10,6 +10,7 @@ import { ApiError } from '@/lib/api-client';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { profileApi, type UserProfile, type UsernameChangeRequest } from '@/features/profile/profileApi';
 import { useTheme } from '@/lib/theme';
+import { friendsApi, type BlockedUser, type FriendRequestPolicy } from '@/features/friends/friendsApi';
 
 const LINK_PLATFORMS = [
   { value: 'github',    label: 'GitHub' },
@@ -505,7 +506,7 @@ function AccountSettings() {
               </select>
               {profileForm.visibility === 'FriendsOnly' && (
                 <div style={{ fontSize: 12, color: 'var(--text-lo)', marginTop: 6 }}>
-                  Friends-only visibility is saved now. Until the friends module is implemented, it behaves like private.
+                  Friends-only visibility now uses your real friend list. Non-friends cannot view it.
                 </div>
               )}
             </Field>
@@ -911,8 +912,12 @@ function PrivacySettings() {
   const toast = useToast();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [onlineStatus, setOnlineStatus] = useState(true);
+  const [friendPolicy, setFriendPolicy] = useState<FriendRequestPolicy>('Anyone');
+  const [blocked, setBlocked] = useState<BlockedUser[]>([]);
   useEffect(() => {
     profileApi.getMe().then(setProfile).catch(() => {});
+    friendsApi.privacy().then(p => setFriendPolicy(p.friendRequestPolicy)).catch(() => {});
+    friendsApi.blocks().then(setBlocked).catch(() => setBlocked([]));
   }, []);
 
   const setVisibility = async (visibility: UserProfile['visibility']) => {
@@ -944,18 +949,64 @@ function PrivacySettings() {
       } />
       {profile?.visibility === 'FriendsOnly' && (
         <div style={{ fontSize: 12, color: 'var(--text-lo)', padding: '0 0 10px' }}>
-          Friends-only visibility is saved now. Until the friends module is implemented, it behaves like private.
+          Friends-only visibility now uses your real friend list. Non-friends cannot view it.
         </div>
       )}
       <SettingRow label="Show online status" hint="Friends always see you online" right={<Toggle on={onlineStatus} onChange={setOnlineStatus} label="" />} />
       <SettingRow label="Allow friend requests from" right={
         <div className="tabs">
-          {['Anyone', 'Friends-of-friends', 'Off'].map(d => (
-            <button key={d} className={`tab ${d === 'Friends-of-friends' ? 'tab--active' : ''}`}>{d}</button>
+          {[
+            { value: 'Anyone' as const, label: 'Anyone' },
+            { value: 'FriendsOfFriends' as const, label: 'Friends-of-friends' },
+            { value: 'Off' as const, label: 'Off' },
+          ].map(option => (
+            <button
+              key={option.value}
+              className={`tab ${friendPolicy === option.value ? 'tab--active' : ''}`}
+              onClick={async () => {
+                try {
+                  const updated = await friendsApi.updatePrivacy(option.value);
+                  setFriendPolicy(updated.friendRequestPolicy);
+                  toast.push({ kind: 'success', title: 'Friend request privacy updated.' });
+                } catch (e) {
+                  toast.push({ kind: 'default', title: e instanceof ApiError ? e.message : 'Could not update friend request privacy.' });
+                }
+              }}
+            >
+              {option.label}
+            </button>
           ))}
         </div>
       } />
-      <SettingRow label="Block list" hint="0 blocked players" right={<Button size="sm" variant="ghost">Manage</Button>} />
+      <SettingRow
+        label="Block list"
+        hint={`${blocked.length} blocked player${blocked.length === 1 ? '' : 's'}`}
+        right={<Button size="sm" variant="ghost" onClick={() => friendsApi.blocks().then(setBlocked).catch(() => {})}>Refresh</Button>}
+      />
+      {blocked.length > 0 && (
+        <div className="col" style={{ gap: 8, paddingTop: 10, borderTop: '1px solid var(--border-1)' }}>
+          {blocked.map(item => (
+            <div key={item.userId} className="surface row mobile-wrap" style={{ padding: 10, gap: 10 }}>
+              <Avatar user={{ initials: item.initials, color: item.avatarFallbackColor }} src={item.avatarUrl} size="sm" />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{item.displayName}</div>
+                <div className="mono" style={{ fontSize: 11, color: 'var(--text-lo)' }}>@{item.username}</div>
+              </div>
+              <Button size="sm" variant="ghost" onClick={async () => {
+                try {
+                  await friendsApi.unblock(item.userId);
+                  setBlocked(list => list.filter(x => x.userId !== item.userId));
+                  toast.push({ kind: 'success', title: 'User unblocked.' });
+                } catch (e) {
+                  toast.push({ kind: 'default', title: e instanceof ApiError ? e.message : 'Could not unblock user.' });
+                }
+              }}>
+                Unblock
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
     </SettingCard>
   );
 }

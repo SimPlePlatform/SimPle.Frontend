@@ -37,6 +37,8 @@ const SAMPLE_PROFILE = {
   role: 'Player',
   level: 1,
   elo: 1200,
+  friendCount: 0,
+  friendshipStatus: 'Self',
   joinedAt: '2026-01-01T00:00:00Z',
   links: [],
   interests: [],

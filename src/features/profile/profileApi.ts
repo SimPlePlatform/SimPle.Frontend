@@ -30,6 +30,8 @@ export interface UserProfile {
   role: string;
   level: number;
   elo: number;
+  friendCount: number;
+  friendshipStatus: string;
   joinedAt: string;
   links: ExternalLink[];
   interests: string[];

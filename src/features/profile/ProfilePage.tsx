@@ -14,6 +14,7 @@ import { rarityBg, rarityFg } from '@/lib/utils';
 import { profileApi, type UserProfile } from '@/features/profile/profileApi';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { ApiError } from '@/lib/api-client';
+import { friendsApi } from '@/features/friends/friendsApi';
 
 const VISIBILITY_STYLES: Record<string, { label: string; color: string; bg: string }> = {
   Public:      { label: 'Public',       color: '#34D399', bg: 'rgba(52,211,153,0.12)' },
@@ -156,6 +157,29 @@ export function ProfilePage({ userId }: { userId: string }) {
     } finally {
       setMediaLoading(null);
       setBannerMenuOpen(false);
+    }
+  };
+
+  const handleFriendAction = async (action: 'send' | 'remove' | 'block') => {
+    if (!profile) return;
+    setSaveLoading(true);
+    try {
+      if (action === 'send') {
+        await friendsApi.sendRequest(profile.userId);
+        toast.push({ kind: 'success', title: 'Friend request sent.' });
+      } else if (action === 'remove') {
+        await friendsApi.removeFriend(profile.userId);
+        toast.push({ kind: 'success', title: 'Friend removed.' });
+      } else {
+        await friendsApi.block(profile.userId);
+        toast.push({ kind: 'success', title: 'User blocked.' });
+      }
+      const updated = await profileApi.getPublic(profile.username);
+      setProfile(updated);
+    } catch (e) {
+      toast.push({ kind: 'default', title: e instanceof ApiError ? e.message : 'Could not update friendship.' });
+    } finally {
+      setSaveLoading(false);
     }
   };
 
@@ -331,6 +355,18 @@ export function ProfilePage({ userId }: { userId: string }) {
               <span className="chip chip--mono">Lv {profile.level}</span>
               <span className="chip chip--mono">{profile.profileType}</span>
               <VisibilityBadge visibility={profile.visibility} />
+              {!isOwn && profile.friendshipStatus === 'None' && (
+                <Button size="sm" icon="plus" disabled={saveLoading} onClick={() => void handleFriendAction('send')}>Add Friend</Button>
+              )}
+              {!isOwn && profile.friendshipStatus === 'RequestSent' && (
+                <span className="chip chip--mono">Request sent</span>
+              )}
+              {!isOwn && profile.friendshipStatus === 'Friends' && (
+                <Button size="sm" variant="ghost" icon="x" disabled={saveLoading} onClick={() => void handleFriendAction('remove')}>Remove Friend</Button>
+              )}
+              {!isOwn && profile.friendshipStatus !== 'Blocked' && (
+                <Button size="sm" variant="ghost" icon="shield" disabled={saveLoading} onClick={() => void handleFriendAction('block')}>Block</Button>
+              )}
             </div>
           </div>
           {!editing ? (
@@ -363,7 +399,7 @@ export function ProfilePage({ userId }: { userId: string }) {
         <StatCard label="Matches"     value="-"  hint="Module 10"   icon="controller" />
         <StatCard label="Win rate"    value="-"  hint="Module 10"   icon="trophy" />
         <StatCard label="Best streak" value="-"  hint="Module 10"   icon="flame" />
-        <StatCard label="Friends"     value="-"  hint="Module 3"    icon="users" accent="ice" />
+        <StatCard label="Friends"     value={String(profile.friendCount ?? 0)}  hint="Social graph"    icon="users" accent="ice" />
       </div>
 
       <div style={{ marginTop: 24 }}>
