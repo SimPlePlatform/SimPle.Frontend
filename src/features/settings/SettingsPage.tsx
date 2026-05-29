@@ -1,5 +1,5 @@
 ﻿'use client';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
 import { Icon } from '@/components/ui/Icons';
@@ -69,7 +69,7 @@ export function SettingsPage() {
       </div>
 
       {/* Mobile: horizontal scroll pills; Desktop: side nav */}
-      <div className="settings-pills scroll-pills" style={{ marginTop: 16, display: 'none', gap: 8 }}>
+      <div className="settings-pills scroll-pills" style={{ marginTop: 16, gap: 8 }}>
         {SECTIONS.map(s => (
           <button
             key={s.id}
@@ -228,7 +228,7 @@ function AccountSettings() {
     }
   };
 
-  const loadSessions = useCallback(async () => {
+  const loadSessions = async () => {
     setSessionsLoading(true);
     try {
       const data = await accountApi.getSessions();
@@ -238,7 +238,7 @@ function AccountSettings() {
     } finally {
       setSessionsLoading(false);
     }
-  }, [toast]);
+  };
 
   const handleRevokeSession = async (id: string) => {
     try {

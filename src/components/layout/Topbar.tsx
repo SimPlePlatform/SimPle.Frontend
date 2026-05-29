@@ -176,6 +176,9 @@ function UserMenuButton() {
           <button className="btn btn-ghost btn-sm" style={{ width:'100%', justifyContent:'flex-start' }} onClick={() => router.push(ROUTES.profile('me'))}>
             <Icon name="user" size={14} /> My Profile
           </button>
+          <button className="btn btn-ghost btn-sm" style={{ width:'100%', justifyContent:'flex-start', marginTop:4 }} onClick={() => router.push(ROUTES.settings)}>
+            <Icon name="settings" size={14} /> Settings
+          </button>
           <button className="btn btn-ghost btn-sm" style={{ width:'100%', justifyContent:'flex-start', marginTop:4 }} onClick={() => void signOut()} disabled={signingOut}>
             <Icon name="arrowRight" size={14} /> {signingOut ? 'Signing out...' : 'Sign out'}
           </button>
