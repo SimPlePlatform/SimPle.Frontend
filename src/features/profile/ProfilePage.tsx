@@ -186,7 +186,7 @@ export function ProfilePage({ userId }: { userId: string }) {
   return (
     <div className="page">
       <div className="card-elev" style={{ overflow: 'hidden', padding: 0 }}>
-        <div style={{ height: 160, position: 'relative', background: profile.bannerUrl ? `url(${profile.bannerUrl}) center/cover` : `linear-gradient(135deg, ${localBannerColor ?? profile.bannerFallbackColor} 0%, #1B2238 55%, #0B0F18 100%)` }}>
+        <div className="profile-banner" style={{ height: 160, position: 'relative', background: profile.bannerUrl ? `url(${profile.bannerUrl}) center/cover` : `linear-gradient(135deg, ${localBannerColor ?? profile.bannerFallbackColor} 0%, #1B2238 55%, #0B0F18 100%)` }}>
           <div className="grid-bg" style={{ opacity: 0.5 }} />
           {isOwn && (
             <div style={{ position: 'absolute', top: 14, right: editing ? 170 : 14 }}>
@@ -248,9 +248,9 @@ export function ProfilePage({ userId }: { userId: string }) {
             </div>
           )}
         </div>
-        <div style={{ padding: '0 24px 24px', marginTop: -44 }}>
+        <div style={{ padding: '0 24px 24px', marginTop: -44, position: 'relative', zIndex: 1 }}>
           <div className="row between mobile-wrap" style={{ alignItems: 'flex-end', flexWrap: 'wrap', gap: 12 }}>
-            <div className="row mobile-wrap" style={{ gap: 18, alignItems: 'flex-end' }}>
+            <div className="row mobile-wrap profile-header-inner" style={{ gap: 18, alignItems: 'flex-end' }}>
               <div style={{ position: 'relative' }}>
                 <input
                   ref={avatarInputRef}
@@ -307,10 +307,10 @@ export function ProfilePage({ userId }: { userId: string }) {
                   </div>
                 )}
               </div>
-              <div style={{ paddingBottom: 6 }}>
+              <div style={{ paddingBottom: 6, minWidth: 0 }}>
                 {!editing ? (
                   <>
-                    <div className="font-display" style={{ fontSize: 24, fontWeight: 600 }}>{profile.displayName}</div>
+                    <div className="font-display profile-display-name" style={{ fontSize: 24, fontWeight: 600 }}>{profile.displayName}</div>
                     <div className="mono" style={{ fontSize: 12, color: 'var(--text-lo)' }}>
                       @{profile.username}  -  joined {joinedYear}{regionText ? `  -  ${regionText}` : ''}
                     </div>

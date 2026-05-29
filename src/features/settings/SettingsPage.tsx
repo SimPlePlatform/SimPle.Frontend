@@ -114,7 +114,7 @@ function SettingCard({ title, sub, children }: { title: string; sub?: string; ch
 
 function SettingRow({ label, hint, right }: { label: string; hint?: string; right: React.ReactNode }) {
   return (
-    <div className="row between setting-row" style={{ padding: '12px 0', borderTop: '1px solid var(--border-1)' }}>
+    <div className="row between setting-row" style={{ padding: '12px 0', borderTop: '1px solid var(--border-1)', flexWrap: 'wrap', gap: 8 }}>
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 13.5, fontWeight: 500 }}>{label}</div>
         {hint && <div style={{ fontSize: 12, color: 'var(--text-lo)', marginTop: 2 }}>{hint}</div>}
@@ -326,7 +326,7 @@ function AccountSettings() {
       <SettingCard title="Profile" sub="Public info shown to other players.">
         {profile ? (
           <>
-            <div className="row" style={{ gap: 18 }}>
+            <div className="row mobile-stack settings-profile-row" style={{ gap: 18 }}>
               <div style={{ position: 'relative', cursor: 'pointer' }} title="Click to upload a new avatar">
                 <Avatar user={{ initials: profile.initials, color: localAvatarColor ?? profile.color, status: 'online' }} src={profile.avatarUrl} size="xl" />
                 <label style={{
@@ -356,7 +356,7 @@ function AccountSettings() {
                   <Icon name={avatarUploading ? 'refresh' : 'edit'} size={16} style={{ color: '#fff' }} />
                 </label>
               </div>
-              <div className="col" style={{ gap: 6, minWidth: 150 }}>
+              <div className="col settings-avatar-opts" style={{ gap: 6 }}>
                 {profile.hasUploadedAvatar ? (
                   <Button size="sm" variant="ghost" icon="trash" onClick={async () => {
                     setAvatarUploading(true);
@@ -384,7 +384,7 @@ function AccountSettings() {
                 )}
               </div>
               <div className="col" style={{ flex: 1, gap: 10 }}>
-                <div style={{
+                <div className="profile-banner" style={{
                   minHeight: 72, borderRadius: 8, border: '1px solid var(--border-1)',
                   background: profile.bannerUrl ? `url(${profile.bannerUrl}) center/cover` : `linear-gradient(135deg, ${localBannerColor ?? profile.bannerFallbackColor} 0%, #1B2238 55%, #0B0F18 100%)`,
                   position: 'relative', overflow: 'hidden'
@@ -535,7 +535,7 @@ function AccountSettings() {
               <div className="col" style={{ gap: 8 }}>
                 {linkForm.map((link, index) => (
                   <div key={link.id} className="col" style={{ gap: 4 }}>
-                    <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+                    <div className="row link-form-row" style={{ gap: 8, alignItems: 'center' }}>
                     <select className="input" aria-label="Link platform" value={link.platform}
                       onChange={e => {
                         const newPlatform = e.target.value;

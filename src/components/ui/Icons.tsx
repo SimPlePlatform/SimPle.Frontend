@@ -59,6 +59,7 @@ const PATHS: Record<string, React.ReactNode> = {
   list:         <><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></>,
   signal:       <><path d="M2 20h2M7 17v3M12 13v7M17 9v11M22 4v16"/></>,
   rocket:       <><path d="M5 19a4 4 0 0 1-2-3l3-3 2 2-3 3a4 4 0 0 1-2 1z"/><path d="M14 10a8 8 0 0 1 8-8 8 8 0 0 1-8 8z"/><path d="M9 11c1-4 5-8 9-8l4 4c0 4-4 8-8 9l-3-2z"/><circle cx="16" cy="8" r="1.5"/></>,
+  menu:         <><path d="M4 6h16M4 12h16M4 18h16"/></>,
 };
 
 interface IconProps {

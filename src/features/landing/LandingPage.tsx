@@ -7,6 +7,7 @@ import { Icon } from '@/components/ui/Icons';
 import { GameArt } from '@/components/ui/GameArt';
 import { GAMES } from '@/mock/games';
 import { ROUTES } from '@/lib/routes';
+import { useTheme } from '@/lib/theme';
 
 export function LandingPage() {
   return (
@@ -25,6 +26,7 @@ export function LandingPage() {
 }
 
 function LandingNav() {
+  const { theme, toggleTheme } = useTheme();
   return (
     <div className="landing__nav">
       <div className="container row" style={{ height:64, justifyContent:'space-between' }}>
@@ -39,6 +41,13 @@ function LandingNav() {
           <a href="#tech">Tech</a>
         </nav>
         <div className="row" style={{ gap:8 }}>
+          <button
+            className="btn btn-ghost btn-icon btn-sm"
+            onClick={toggleTheme}
+            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+          >
+            <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={15} />
+          </button>
           <Link href={ROUTES.login}><Button variant="ghost" size="sm">Sign in</Button></Link>
           <Link href={ROUTES.register}><Button size="sm" iconRight="arrowRight">Start playing</Button></Link>
         </div>

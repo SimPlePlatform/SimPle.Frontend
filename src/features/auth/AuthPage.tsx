@@ -87,7 +87,7 @@ export function AuthPage({ initialMode }: { initialMode: Mode }) {
 
 function AuthLeft() {
   return (
-    <div style={{ position:'relative', overflow:'hidden', background:'linear-gradient(180deg, #0A0E18 0%, #07090F 100%)', padding:48, display:'flex', flexDirection:'column', justifyContent:'space-between' }}>
+    <div className="auth-left" style={{ position:'relative', overflow:'hidden', background:'linear-gradient(180deg, #0A0E18 0%, #07090F 100%)', padding:48, display:'flex', flexDirection:'column', justifyContent:'space-between' }}>
       <div className="grid-bg" style={{ opacity:0.5 }} />
       <div className="row" style={{ gap:10, zIndex:2, position:'relative' }}>
         <div className="brand__logo" style={{ width:30, height:30 }} />

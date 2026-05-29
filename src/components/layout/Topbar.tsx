@@ -12,13 +12,37 @@ import { InviteFriendModal } from '@/components/friends/InviteFriendModal';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { useTheme } from '@/lib/theme';
 
-export function Topbar() {
+export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [lobbyOpen, setLobbyOpen]  = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [hidden, setHidden] = useState(false);
+  const lastScrollY = useRef(0);
+
+  useEffect(() => {
+    const onScroll = () => {
+      const current = window.scrollY;
+      if (current > lastScrollY.current && current > 80) {
+        setHidden(true);
+      } else {
+        setHidden(false);
+      }
+      lastScrollY.current = current;
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   return (
-    <header className="topbar">
+    <header className={`topbar${hidden ? ' topbar--hidden' : ''}`}>
+      <button
+        className="btn btn-ghost btn-icon btn-sm topbar__nav-btn"
+        onClick={onMenuClick}
+        aria-label="Open navigation menu"
+      >
+        <Icon name="menu" size={20} />
+      </button>
+
       <div className="row topbar__search" style={{ flex:1, gap:8 }}>
         <div style={{ position:'relative', maxWidth:480, flex:1, minWidth:0 }}>
           <Icon name="search" size={15} style={{ position:'absolute', left:11, top:11, color:'var(--text-lo)' }} />
@@ -27,6 +51,9 @@ export function Topbar() {
         </div>
       </div>
       <div className="row topbar__actions" style={{ gap:8 }}>
+        <button className="btn btn-ghost btn-icon btn-sm topbar__search-btn" aria-label="Search">
+          <Icon name="search" size={16} />
+        </button>
         <Button variant="ghost" size="sm" icon="plus" onClick={() => setLobbyOpen(true)}>Create Lobby</Button>
         <Button variant="ghost" size="sm" icon="users" onClick={() => setInviteOpen(true)}>Invite</Button>
         <ThemeToggleButton />

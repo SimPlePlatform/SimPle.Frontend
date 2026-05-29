@@ -78,25 +78,29 @@ export function GameDetailPage({ gameId }: { gameId: string }) {
             <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}>Start a match</div>
             <div className="page-sub">Choose a mode</div>
             <div className="col" style={{ marginTop: 16, gap: 10 }}>
-              <ActionButton
-                color="#F0394B" icon="play"
-                title="Play vs AI" sub={`Difficulty · ${aiLevel}`}
-                onClick={() => router.push(ROUTES.room(`${game.id}-ai`))}
-              />
-              <div className="row" style={{ gap: 6, flexWrap: 'wrap', padding: '0 4px 4px' }}>
-                {game.aiLevels.map(lvl => (
-                  <button
-                    key={lvl}
-                    className="chip"
-                    onClick={() => setAiLevel(lvl)}
-                    style={{
-                      background: aiLevel === lvl ? 'var(--red-soft)' : undefined,
-                      color: aiLevel === lvl ? 'var(--red-400)' : undefined,
-                      borderColor: aiLevel === lvl ? 'rgba(240,57,75,0.3)' : undefined,
-                      cursor: 'pointer',
-                    }}
-                  >{lvl}</button>
-                ))}
+              <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                <ActionButton
+                  color="#F0394B" icon="play"
+                  title="Solo vs AI" sub={`Difficulty · ${aiLevel}`}
+                  onClick={() => router.push(ROUTES.room(`${game.id}-ai`))}
+                  noBorder
+                />
+                <div className="row" style={{ gap: 6, flexWrap: 'wrap', padding: '6px 14px 10px', borderTop: '1px solid var(--border-1)' }}>
+                  <span style={{ fontSize: 11, color: 'var(--text-lo)', alignSelf: 'center', fontFamily: 'var(--font-mono)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Level:</span>
+                  {game.aiLevels.map(lvl => (
+                    <button
+                      key={lvl}
+                      className="chip"
+                      onClick={() => setAiLevel(lvl)}
+                      style={{
+                        background: aiLevel === lvl ? 'var(--red-soft)' : undefined,
+                        color: aiLevel === lvl ? 'var(--red-400)' : undefined,
+                        borderColor: aiLevel === lvl ? 'rgba(240,57,75,0.3)' : undefined,
+                        cursor: 'pointer',
+                      }}
+                    >{lvl}</button>
+                  ))}
+                </div>
               </div>
               <ActionButton
                 color="#38BDF8" icon="users"
@@ -162,23 +166,30 @@ function InlineStat({ label, value, icon }: { label: string; value: string; icon
   );
 }
 
-function ActionButton({ color, icon, title, sub, onClick }: {
-  color: string; icon: string; title: string; sub: string; onClick: () => void;
+function ActionButton({ color, icon, title, sub, onClick, noBorder }: {
+  color: string; icon: string; title: string; sub: string; onClick: () => void; noBorder?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
-      className="surface row"
-      style={{ padding: 14, gap: 12, width: '100%', textAlign: 'left', border: '1px solid var(--border-1)' }}
+      style={{
+        display: 'flex', flexDirection: 'row', alignItems: 'center', flexWrap: 'nowrap',
+        gap: 12, padding: 14, width: '100%', textAlign: 'left', cursor: 'pointer',
+        background: noBorder ? 'var(--bg-2)' : 'linear-gradient(180deg, rgba(255,255,255,0.02), transparent 40%), var(--bg-2)',
+        border: noBorder ? 'none' : '1px solid var(--border-1)',
+        borderRadius: noBorder ? 0 : 'var(--r-md)',
+        transition: 'background 0.15s',
+        boxSizing: 'border-box',
+      }}
     >
-      <div style={{ width: 38, height: 38, borderRadius: 10, background: `${color}1f`, color, display: 'grid', placeItems: 'center', border: `1px solid ${color}44` }}>
+      <div style={{ width: 38, height: 38, flexShrink: 0, borderRadius: 10, background: `${color}1f`, color, display: 'grid', placeItems: 'center', border: `1px solid ${color}44` }}>
         <Icon name={icon} size={18} />
       </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--text-hi)' }}>{title}</div>
-        <div className="mono" style={{ fontSize: 11, color: 'var(--text-lo)' }}>{sub}</div>
+      <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+        <div style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--text-hi)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-lo)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sub}</div>
       </div>
-      <Icon name="chevronRight" size={16} style={{ color: 'var(--text-lo)' }} />
+      <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="var(--text-lo)" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M9 6l6 6-6 6"/></svg>
     </button>
   );
 }
