@@ -18,14 +18,14 @@ export function Topbar() {
 
   return (
     <header className="topbar">
-      <div className="row" style={{ flex:1, gap:8 }}>
-        <div style={{ position:'relative', maxWidth:480, flex:1 }}>
+      <div className="row topbar__search" style={{ flex:1, gap:8 }}>
+        <div style={{ position:'relative', maxWidth:480, flex:1, minWidth:0 }}>
           <Icon name="search" size={15} style={{ position:'absolute', left:11, top:11, color:'var(--text-lo)' }} />
           <input className="input" placeholder="Search games, friends, lobbies…" style={{ paddingLeft:34 }} />
           <span className="chip chip--mono" style={{ position:'absolute', right:8, top:7, height:24, fontSize:10 }}>⌘ K</span>
         </div>
       </div>
-      <div className="row" style={{ gap:8 }}>
+      <div className="row topbar__actions" style={{ gap:8 }}>
         <Button variant="ghost" size="sm" icon="plus" onClick={() => setLobbyOpen(true)}>Create Lobby</Button>
         <Button variant="ghost" size="sm" icon="users" onClick={() => setInviteOpen(true)}>Invite</Button>
         <NotificationBell open={notifOpen} setOpen={setNotifOpen} />
@@ -58,7 +58,7 @@ function NotificationBell({ open, setOpen }: { open: boolean; setOpen: (v: boole
         {count > 0 && <span style={{ position:'absolute', top:4, right:5, width:7, height:7, borderRadius:999, background:'var(--red-500)', boxShadow:'0 0 0 2px var(--bg-1)' }} />}
       </button>
       {open && (
-        <div className="card-elev" style={{ position:'absolute', right:0, top:'calc(100% + 8px)', width:340, zIndex:40, padding:0, overflow:'hidden' }}>
+        <div className="card-elev dropdown-panel dropdown-panel--wide" style={{ position:'absolute', right:0, top:'calc(100% + 8px)', width:340, zIndex:40, padding:0, overflow:'hidden' }}>
           <div style={{ padding:'12px 14px', borderBottom:'1px solid var(--border-2)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
             <div style={{ fontWeight:600, fontFamily:'var(--font-display)' }}>Notifications</div>
             <span className="chip chip--red chip--mono">{count} new</span>
@@ -120,18 +120,18 @@ function UserMenuButton() {
   return (
     <div ref={ref} style={{ position:'relative' }}>
       <button
-        className="row"
+        className="row user-menu-trigger"
         onClick={() => setOpen(value => !value)}
         style={{ background:'transparent', border:'1px solid var(--border-2)', padding:'4px 10px 4px 4px', borderRadius:999, gap:8 }}
         aria-expanded={open}
         aria-label="Account menu"
       >
         <Avatar user={{ initials:user.initials, color:user.color, status:'online' }} size="sm" showPresence />
-        <span style={{ fontSize:12.5, fontWeight:500 }}>{user.displayName.split(' ')[0]}</span>
+        <span className="user-menu-trigger__name" style={{ fontSize:12.5, fontWeight:500 }}>{user.displayName.split(' ')[0]}</span>
         <Icon name="chevronDown" size={13} style={{ color:'var(--text-lo)' }} />
       </button>
       {open && (
-        <div className="card-elev" style={{ position:'absolute', right:0, top:'calc(100% + 8px)', width:190, zIndex:40, padding:8 }}>
+        <div className="card-elev dropdown-panel" style={{ position:'absolute', right:0, top:'calc(100% + 8px)', width:190, zIndex:40, padding:8 }}>
           <button className="btn btn-ghost btn-sm" style={{ width:'100%', justifyContent:'flex-start' }} onClick={() => router.push(ROUTES.profile('me'))}>
             <Icon name="user" size={14} /> My Profile
           </button>

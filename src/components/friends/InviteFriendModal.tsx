@@ -58,7 +58,7 @@ export function InviteFriendModal({ open, onClose, preselectedGameId }: Props) {
           <div className="row between" style={{ marginBottom:6 }}>
             <span className="label">Game</span>
           </div>
-          <div className="row" style={{ gap:6, flexWrap:'wrap' }}>
+          <div className="row mobile-wrap" style={{ gap:6, flexWrap:'wrap' }}>
             {GAMES.slice(0,6).map(g => (
               <button key={g.id} onClick={() => setGame(g.id)} className="chip" style={{
                 cursor:'pointer', height:30,
@@ -86,7 +86,7 @@ export function InviteFriendModal({ open, onClose, preselectedGameId }: Props) {
           ) : friends.map(f => {
             const on = picked.has(f.id);
             return (
-              <button key={f.id} onClick={() => toggle(f.id)} className="row" style={{ width:'100%', padding:'10px 12px', borderBottom:'1px solid var(--border-1)', background: on ? 'var(--red-soft)' : 'transparent', gap:12, textAlign:'left' }}>
+              <button key={f.id} onClick={() => toggle(f.id)} className="row mobile-wrap" style={{ width:'100%', padding:'10px 12px', borderBottom:'1px solid var(--border-1)', background: on ? 'var(--red-soft)' : 'transparent', gap:12, textAlign:'left' }}>
                 <Avatar user={f} showPresence size="sm" />
                 <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ fontSize:13, fontWeight:600 }}>{f.display}</div>

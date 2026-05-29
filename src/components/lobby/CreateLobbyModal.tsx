@@ -84,9 +84,9 @@ export function CreateLobbyModal({ open, onClose }: Props) {
         </div>
 
         <div className="surface" style={{ padding:12 }}>
-          <div className="row" style={{ gap:10 }}>
+          <div className="row mobile-wrap" style={{ gap:10 }}>
             <Icon name="link" size={14} style={{ color:'var(--text-lo)' }} />
-            <span className="mono" style={{ fontSize:12, color:'var(--text-md)' }}>simple.gg/j/SP-7F-29</span>
+            <span className="mono" style={{ fontSize:12, color:'var(--text-md)', overflowWrap:'anywhere' }}>simple.gg/j/SP-7F-29</span>
             <div className="grow" />
             <span className="chip chip--mono">Auto-expires 30m</span>
           </div>

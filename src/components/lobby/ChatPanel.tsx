@@ -25,7 +25,7 @@ export function ChatPanel({ chat, onSend, title = 'Chat', compact = false }: Cha
   };
 
   return (
-    <div className="card" style={{ padding: 0, display: 'flex', flexDirection: 'column', minHeight: compact ? 280 : 320 }}>
+    <div className="card" style={{ padding: 0, display: 'flex', flexDirection: 'column', minHeight: compact ? 280 : 320, minWidth: 0 }}>
       <div className="row between" style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-1)' }}>
         <div className="row" style={{ gap: 8 }}>
           <Icon name="message" size={14} style={{ color: 'var(--text-lo)' }} />
@@ -42,12 +42,12 @@ export function ChatPanel({ chat, onSend, title = 'Chat', compact = false }: Cha
                 <span style={{ fontSize: 12, fontWeight: 600, color: m.me ? 'var(--red-400)' : 'var(--text-hi)' }}>{m.from}</span>
                 <span className="mono" style={{ fontSize: 10.5, color: 'var(--text-lo)' }}>{m.when}</span>
               </div>
-              <div style={{ fontSize: 13, color: 'var(--text-md)', marginTop: 2 }}>{m.text}</div>
+              <div style={{ fontSize: 13, color: 'var(--text-md)', marginTop: 2, overflowWrap: 'anywhere' }}>{m.text}</div>
             </div>
           </div>
         ))}
       </div>
-      <div style={{ padding: '10px 12px', borderTop: '1px solid var(--border-1)', display: 'flex', gap: 8 }}>
+      <div style={{ padding: '10px 12px', borderTop: '1px solid var(--border-1)', display: 'flex', gap: 8, minWidth: 0 }}>
         <input
           className="input"
           placeholder="Message…"

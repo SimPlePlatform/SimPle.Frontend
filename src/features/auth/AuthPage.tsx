@@ -50,9 +50,9 @@ export function AuthPage({ initialMode }: { initialMode: Mode }) {
   };
 
   return (
-    <div style={{ minHeight:'100vh', display:'grid', gridTemplateColumns:'1fr 1fr', background:'var(--bg-0)' }}>
+    <div className="responsive-auth" style={{ minHeight:'100vh', background:'var(--bg-0)' }}>
       <AuthLeft />
-      <div style={{ display:'grid', placeItems:'center', padding:32 }}>
+      <div style={{ display:'grid', placeItems:'center', padding:32, minWidth: 0 }}>
         <div style={{ width:'100%', maxWidth:420 }}>
           {status !== 'anonymous' ? (
             <div style={{ textAlign:'center', color:'var(--text-md)' }}>Checking your session...</div>

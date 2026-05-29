@@ -67,8 +67,8 @@ export function SettingsPage() {
         <div className="page-sub">Account, gameplay, notifications and more.</div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 24, marginTop: 22 }}>
-        <aside className="card" style={{ padding: 8, height: 'fit-content' }}>
+      <div className="settings-layout" style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 24, marginTop: 22 }}>
+        <aside className="card settings-nav" style={{ padding: 8, height: 'fit-content' }}>
           {SECTIONS.map(s => (
             <button
               key={s.id}
@@ -88,7 +88,7 @@ export function SettingsPage() {
           ))}
         </aside>
 
-        <div>
+        <div style={{ minWidth: 0 }}>
           {tab === 'account' && <AccountSettings />}
           {tab === 'theme'   && <ThemeSettings />}
           {tab === 'notify'  && <NotifySettings />}
@@ -101,7 +101,7 @@ export function SettingsPage() {
 
 function SettingCard({ title, sub, children }: { title: string; sub?: string; children: React.ReactNode }) {
   return (
-    <div className="card" style={{ padding: 22, marginBottom: 18 }}>
+    <div className="card setting-card" style={{ padding: 22, marginBottom: 18 }}>
       <div style={{ marginBottom: 14 }}>
         <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 16 }}>{title}</div>
         {sub && <div className="page-sub">{sub}</div>}
@@ -113,12 +113,12 @@ function SettingCard({ title, sub, children }: { title: string; sub?: string; ch
 
 function SettingRow({ label, hint, right }: { label: string; hint?: string; right: React.ReactNode }) {
   return (
-    <div className="row between" style={{ padding: '12px 0', borderTop: '1px solid var(--border-1)' }}>
+    <div className="row between setting-row" style={{ padding: '12px 0', borderTop: '1px solid var(--border-1)' }}>
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 13.5, fontWeight: 500 }}>{label}</div>
         {hint && <div style={{ fontSize: 12, color: 'var(--text-lo)', marginTop: 2 }}>{hint}</div>}
       </div>
-      <div>{right}</div>
+      <div style={{ minWidth: 0 }}>{right}</div>
     </div>
   );
 }
@@ -154,6 +154,8 @@ function AccountSettings() {
   const [localBannerColor, setLocalBannerColor] = useState<string | null>(null);
   // Warn when Save Changes is clicked while there are unsaved link edits.
   const [linksConflict, setLinksConflict] = useState(false);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
 
   useEffect(() => {
     profileApi.getMe().then(p => {
@@ -211,9 +213,6 @@ function AccountSettings() {
     }
   };
 
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [sessionsLoading, setSessionsLoading] = useState(false);
-
   const loadSessions = useCallback(async () => {
     setSessionsLoading(true);
     try {
@@ -224,7 +223,7 @@ function AccountSettings() {
     } finally {
       setSessionsLoading(false);
     }
-  }, [toast]);
+  }, [toast, setSessions]);
 
   const handleRevokeSession = async (id: string) => {
     try {
