@@ -10,6 +10,7 @@ import { ROUTES } from '@/lib/routes';
 import { CreateLobbyModal } from '@/components/lobby/CreateLobbyModal';
 import { InviteFriendModal } from '@/components/friends/InviteFriendModal';
 import { useAuth } from '@/features/auth/AuthProvider';
+import { useTheme } from '@/lib/theme';
 
 export function Topbar() {
   const [notifOpen, setNotifOpen] = useState(false);
@@ -28,6 +29,7 @@ export function Topbar() {
       <div className="row topbar__actions" style={{ gap:8 }}>
         <Button variant="ghost" size="sm" icon="plus" onClick={() => setLobbyOpen(true)}>Create Lobby</Button>
         <Button variant="ghost" size="sm" icon="users" onClick={() => setInviteOpen(true)}>Invite</Button>
+        <ThemeToggleButton />
         <NotificationBell open={notifOpen} setOpen={setNotifOpen} />
         <div style={{ width:1, height:28, background:'var(--border-1)' }} />
         <UserMenuButton />
@@ -36,6 +38,22 @@ export function Topbar() {
       <CreateLobbyModal open={lobbyOpen} onClose={() => setLobbyOpen(false)} />
       <InviteFriendModal open={inviteOpen} onClose={() => setInviteOpen(false)} />
     </header>
+  );
+}
+
+function ThemeToggleButton() {
+  const { theme, toggleTheme } = useTheme();
+  const isDark = theme === 'dark';
+
+  return (
+    <button
+      className="btn btn-ghost btn-icon btn-sm"
+      onClick={toggleTheme}
+      aria-label={`Switch to ${isDark ? 'light' : 'dark'} theme`}
+      title={`Switch to ${isDark ? 'light' : 'dark'} theme`}
+    >
+      <Icon name={isDark ? 'sun' : 'moon'} size={15} />
+    </button>
   );
 }
 

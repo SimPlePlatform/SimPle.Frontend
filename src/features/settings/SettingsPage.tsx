@@ -9,6 +9,7 @@ import { accountApi, type Session } from '@/features/auth/accountApi';
 import { ApiError } from '@/lib/api-client';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { profileApi, type UserProfile, type UsernameChangeRequest } from '@/features/profile/profileApi';
+import { useTheme } from '@/lib/theme';
 
 const LINK_PLATFORMS = [
   { value: 'github',    label: 'GitHub' },
@@ -826,66 +827,68 @@ function AccountSettings() {
 }
 
 function ThemeSettings() {
-  const [theme, setTheme] = useState('midnight');
-  const [accent, setAccent] = useState('#F0394B');
-  const [density, setDensity] = useState('Default');
-  const themes = [
-    { id: 'midnight', name: 'Midnight', a: '#0A0E18', b: '#161C2E' },
-    { id: 'obsidian', name: 'Obsidian', a: '#070B14', b: '#10162A' },
-    { id: 'slate',    name: 'Slate',    a: '#0F172A', b: '#1E293B' },
+  const { theme, setTheme } = useTheme();
+
+  const options = [
+    {
+      id: 'dark' as const,
+      name: 'Dark',
+      sub: 'Midnight blue - default',
+      preview: (
+        <div style={{ position: 'relative', height: 60, borderRadius: 8, background: 'linear-gradient(180deg, #0A0E18, #161C2E)', border: '1px solid #252E48', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', top: 8, left: 8, width: 18, height: 6, borderRadius: 3, background: '#F0394B' }} />
+          <div style={{ position: 'absolute', top: 8, left: 30, width: 38, height: 6, borderRadius: 3, background: '#252E48' }} />
+          <div style={{ position: 'absolute', top: 22, left: 8, right: 8, height: 24, borderRadius: 5, background: '#161C2E', border: '1px solid #252E48' }} />
+        </div>
+      ),
+    },
+    {
+      id: 'light' as const,
+      name: 'Light',
+      sub: 'Soft ink - paper white',
+      preview: (
+        <div style={{ position: 'relative', height: 60, borderRadius: 8, background: 'linear-gradient(180deg, #FFFFFF, #F4F6FB)', border: '1px solid #DEE3EF', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', top: 8, left: 8, width: 18, height: 6, borderRadius: 3, background: '#D62133' }} />
+          <div style={{ position: 'absolute', top: 8, left: 30, width: 38, height: 6, borderRadius: 3, background: '#DEE3EF' }} />
+          <div style={{ position: 'absolute', top: 22, left: 8, right: 8, height: 24, borderRadius: 5, background: '#FFFFFF', border: '1px solid #DEE3EF' }} />
+        </div>
+      ),
+    },
   ];
+
   return (
-    <>
-      <SettingCard title="Appearance" sub="Dark-first. Light coming later.">
-        <div className="grid grid-3">
-          {themes.map(t => (
-            <button
-              key={t.id}
-              onClick={() => setTheme(t.id)}
-              className="surface"
-              style={{
-                padding: 14, textAlign: 'left', cursor: 'pointer',
-                border: theme === t.id ? '1px solid rgba(240,57,75,0.4)' : undefined,
-                background: theme === t.id ? 'var(--red-soft)' : undefined,
-              }}
-            >
-              <div style={{ height: 60, borderRadius: 8, background: `linear-gradient(180deg, ${t.a}, ${t.b})`, border: '1px solid var(--border-2)' }} />
-              <div className="row between" style={{ marginTop: 10 }}>
-                <span style={{ fontSize: 13, fontWeight: 600 }}>{t.name}</span>
-                {theme === t.id && <span className="chip chip--red chip--mono"><Icon name="check" size={11} />Active</span>}
+    <SettingCard title="Appearance" sub="Choose your visual mode. Persists across sessions.">
+      <div className="grid grid-2">
+        {options.map(option => (
+          <button
+            key={option.id}
+            onClick={() => setTheme(option.id)}
+            className="surface"
+            aria-pressed={theme === option.id}
+            style={{
+              padding: 14,
+              textAlign: 'left',
+              cursor: 'pointer',
+              border: theme === option.id ? '1px solid rgba(240,57,75,0.4)' : '1px solid var(--border-2)',
+              background: theme === option.id ? 'var(--red-soft)' : 'var(--bg-2)',
+            }}
+          >
+            {option.preview}
+            <div className="row between" style={{ marginTop: 12 }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{option.name}</div>
+                <div className="mono" style={{ fontSize: 11, color: 'var(--text-lo)', marginTop: 2 }}>{option.sub}</div>
               </div>
-            </button>
-          ))}
-        </div>
-      </SettingCard>
-
-      <SettingCard title="Accent color">
-        <div className="row" style={{ gap: 10 }}>
-          {['#F0394B', '#38BDF8', '#A78BFA', '#34D399', '#F59E0B', '#F472B6'].map(c => (
-            <button
-              key={c}
-              onClick={() => setAccent(c)}
-              aria-label={c}
-              style={{
-                width: 34, height: 34, borderRadius: 999, background: c, cursor: 'pointer',
-                border: accent === c ? '2px solid #fff' : '2px solid transparent',
-                boxShadow: accent === c ? `0 0 0 2px var(--bg-0), 0 0 0 4px ${c}` : 'none',
-              }}
-            />
-          ))}
-        </div>
-      </SettingCard>
-
-      <SettingCard title="Density">
-        <SettingRow label="UI density" hint="Compact saves space, comfortable feels premium." right={
-          <div className="tabs">
-            {['Compact', 'Default', 'Comfortable'].map(d => (
-              <button key={d} className={`tab ${d === density ? 'tab--active' : ''}`} onClick={() => setDensity(d)}>{d}</button>
-            ))}
-          </div>
-        } />
-      </SettingCard>
-    </>
+              {theme === option.id && <span className="chip chip--red chip--mono"><Icon name="check" size={11} />Active</span>}
+            </div>
+          </button>
+        ))}
+      </div>
+      <div className="surface row" style={{ marginTop: 12, padding: 12, gap: 10 }}>
+        <Icon name="sparkle" size={14} style={{ color: 'var(--ice-400)' }} />
+        <span style={{ fontSize: 12.5, color: 'var(--text-md)' }}>SimPle follows your system preference until you choose one explicitly.</span>
+      </div>
+    </SettingCard>
   );
 }
 
