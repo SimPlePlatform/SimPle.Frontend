@@ -28,12 +28,16 @@ function applyTheme(theme: Theme) {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(() => {
-    if (typeof document !== 'undefined') {
-      return (document.documentElement.getAttribute('data-theme') as Theme) || 'dark';
-    }
-    return 'dark';
-  });
+  // Start with 'dark' on the server. The boot script already set the correct
+  // data-theme on <html> client-side before React hydrates, so the DOM is
+  // correct — we just need the React state to catch up on mount.
+  const [theme, setThemeState] = useState<Theme>('dark');
+
+  // On first client render, read the value the boot script set on <html>.
+  useEffect(() => {
+    const current = (document.documentElement.getAttribute('data-theme') as Theme) || 'dark';
+    setThemeState(current);
+  }, []);
 
   const setTheme = useCallback((t: Theme) => {
     setThemeState(t);
@@ -41,10 +45,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const toggleTheme = useCallback(() => {
-    setTheme(theme === 'dark' ? 'light' : 'dark');
-  }, [theme, setTheme]);
+    setThemeState(prev => {
+      const next = prev === 'dark' ? 'light' : 'dark';
+      applyTheme(next);
+      return next;
+    });
+  }, []);
 
-  // Sync to system preference if the user has no saved preference.
+  // Follow system preference when no explicit choice is stored.
   useEffect(() => {
     const mq = window.matchMedia?.('(prefers-color-scheme: light)');
     if (!mq) return;

@@ -86,29 +86,31 @@ export function AuthPage({ initialMode }: { initialMode: Mode }) {
 }
 
 function AuthLeft() {
+  // This panel always has a dark background regardless of the active theme,
+  // so all text colours are pinned to the dark-mode palette values.
   return (
-    <div style={{ position:'relative', overflow:'hidden', background:'linear-gradient(180deg, #0A0E18 0%, #07090F 100%)', padding:48, display:'flex', flexDirection:'column', justifyContent:'space-between' }}>
+    <div style={{ position:'relative', overflow:'hidden', background:'linear-gradient(180deg, #0A0E18 0%, #07090F 100%)', padding:48, display:'flex', flexDirection:'column', justifyContent:'space-between', color:'#F2F5FB' }}>
       <div className="grid-bg" style={{ opacity:0.5 }} />
       <div className="row" style={{ gap:10, zIndex:2, position:'relative' }}>
         <div className="brand__logo" style={{ width:30, height:30 }} />
-        <div style={{ fontFamily:'var(--font-display)', fontWeight:600, fontSize:20 }}>SimPle</div>
+        <div style={{ fontFamily:'var(--font-display)', fontWeight:600, fontSize:20, color:'#F2F5FB' }}>SimPle</div>
       </div>
       <div style={{ position:'relative', zIndex:2 }}>
         <div className="row" style={{ gap:8, marginBottom:16 }}>
           <span className="chip chip--red chip--mono"><span className="dot dot--playing" />Season 4 live</span>
-          <span className="chip chip--mono">+312 today</span>
+          <span className="chip chip--mono" style={{ background:'rgba(255,255,255,0.06)', color:'#B6BFD5', borderColor:'rgba(255,255,255,0.1)' }}>+312 today</span>
         </div>
-        <h1 className="font-display" style={{ fontSize:48, fontWeight:600, lineHeight:1.05, letterSpacing:'-0.02em', maxWidth:480 }}>
+        <h1 className="font-display" style={{ fontSize:48, fontWeight:600, lineHeight:1.05, letterSpacing:'-0.02em', maxWidth:480, color:'#F2F5FB' }}>
           A premium clubhouse for sharp little games.
         </h1>
-        <p style={{ marginTop:14, maxWidth:440 }}>Find your friends. Drill against AI. Climb a ladder that actually matters.</p>
+        <p style={{ marginTop:14, maxWidth:440, color:'#B6BFD5' }}>Find your friends. Drill against AI. Climb a ladder that actually matters.</p>
         <div style={{ marginTop:32, display:'grid', gap:8, maxWidth:420 }}>
           <ActivityRow initials="PR" color="#38BDF8" name="Priya Raman" text="started a Chess Lite lobby" when="now" />
           <ActivityRow initials="SL" color="#34D399" name="Sara Lindqvist" text="climbed to Diamond II - +24 ELO" when="2m" />
           <ActivityRow initials="MO" color="#A78BFA" name="Mateus Oliveira" text="unlocked Tetris Sprint achievement" when="5m" />
         </div>
       </div>
-      <div className="row" style={{ gap:14, color:'var(--text-lo)', fontSize:12, zIndex:2, position:'relative' }}>
+      <div className="row" style={{ gap:14, color:'#7A8299', fontSize:12, zIndex:2, position:'relative' }}>
         <span className="row" style={{ gap:6 }}><Icon name="lock" size={12} /> End-to-end TLS</span>
         <span className="row" style={{ gap:6 }}><Icon name="shield" size={12} /> Server-validated moves</span>
         <span className="row" style={{ gap:6 }}><Icon name="signal" size={12} /> Region-aware</span>
@@ -119,12 +121,12 @@ function AuthLeft() {
 
 function ActivityRow({ initials, color, name, text, when }: { initials:string; color:string; name:string; text:string; when:string }) {
   return (
-    <div className="surface row" style={{ padding:10, gap:10 }}>
+    <div className="row" style={{ padding:10, gap:10, borderRadius:'var(--r-sm)', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.07)' }}>
       <Avatar user={{ initials, color }} size="sm" />
       <div style={{ flex:1, minWidth:0 }}>
-        <div style={{ fontSize:12.5 }}><b>{name}</b> <span className="muted">{text}</span></div>
+        <div style={{ fontSize:12.5, color:'#F2F5FB' }}><b>{name}</b> <span style={{ color:'#B6BFD5' }}>{text}</span></div>
       </div>
-      <div className="mono" style={{ fontSize:10.5, color:'var(--text-lo)' }}>{when}</div>
+      <div className="mono" style={{ fontSize:10.5, color:'#7A8299' }}>{when}</div>
     </div>
   );
 }
