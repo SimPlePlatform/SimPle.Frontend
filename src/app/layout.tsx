@@ -3,7 +3,6 @@ import Script from 'next/script';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { ToastProvider } from '@/components/ui/Toast';
-import { ThemeHydrator } from '@/components/layout/ThemeHydrator';
 import { AuthProvider } from '@/features/auth/AuthProvider';
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
@@ -24,7 +23,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           src="https://accounts.google.com/gsi/client"
           strategy="lazyOnload"
         />
-        <ThemeHydrator />
         <ToastProvider>
           <AuthProvider>{children}</AuthProvider>
         </ToastProvider>

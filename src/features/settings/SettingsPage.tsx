@@ -826,12 +826,6 @@ function AccountSettings() {
 }
 
 function ThemeSettings() {
-  type ColorMode = 'Light' | 'Dark' | 'System';
-  const [mode, setMode] = useState<ColorMode>(() => {
-    if (typeof window === 'undefined') return 'Dark';
-    const stored = window.localStorage.getItem('simple-color-mode');
-    return stored === 'Light' || stored === 'System' ? stored : 'Dark';
-  });
   const [theme, setTheme] = useState('midnight');
   const [accent, setAccent] = useState('#F0394B');
   const [density, setDensity] = useState('Default');
@@ -840,31 +834,9 @@ function ThemeSettings() {
     { id: 'obsidian', name: 'Obsidian', a: '#070B14', b: '#10162A' },
     { id: 'slate',    name: 'Slate',    a: '#0F172A', b: '#1E293B' },
   ];
-
-  useEffect(() => {
-    const media = window.matchMedia('(prefers-color-scheme: light)');
-    const resolved = mode === 'System' && media.matches ? 'light' : mode.toLowerCase();
-    window.localStorage.setItem('simple-color-mode', mode);
-    document.documentElement.dataset.colorMode = resolved;
-    window.dispatchEvent(new Event('simple-theme-change'));
-  }, [mode]);
-
   return (
     <>
-      <SettingCard title="Appearance" sub="Choose Light, Dark, or follow your system setting.">
-        <SettingRow label="Color mode" hint="Applies across the app on this device." right={
-          <div className="tabs">
-            {(['Light', 'Dark', 'System'] as ColorMode[]).map(item => (
-              <button
-                key={item}
-                className={`tab ${item === mode ? 'tab--active' : ''}`}
-                onClick={() => setMode(item)}
-              >
-                {item}
-              </button>
-            ))}
-          </div>
-        } />
+      <SettingCard title="Appearance" sub="Dark-first. Light coming later.">
         <div className="grid grid-3">
           {themes.map(t => (
             <button
