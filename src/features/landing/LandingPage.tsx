@@ -7,6 +7,7 @@ import { Icon } from '@/components/ui/Icons';
 import { GameArt } from '@/components/ui/GameArt';
 import { GAMES } from '@/mock/games';
 import { ROUTES } from '@/lib/routes';
+import { useTheme } from '@/lib/theme';
 
 export function LandingPage() {
   return (
@@ -25,20 +26,37 @@ export function LandingPage() {
 }
 
 function LandingNav() {
+  const { theme, toggleTheme } = useTheme();
+  const isDark = theme === 'dark';
   return (
     <div className="landing__nav">
-      <div className="container row" style={{ height:64, justifyContent:'space-between' }}>
-        <div className="row" style={{ gap:10 }}>
+      <div className="container row" style={{ height:64, justifyContent:'space-between', gap:12 }}>
+        {/* Brand */}
+        <div className="row" style={{ gap:10, flexShrink:0 }}>
           <div className="brand__logo" style={{ width:28, height:28 }} />
           <div style={{ fontFamily:'var(--font-display)', fontWeight:600, fontSize:18, letterSpacing:'-0.02em' }}>SimPle</div>
           <span className="chip chip--mono" style={{ marginLeft:6 }}>beta</span>
         </div>
-        <nav className="row" style={{ gap:24, fontSize:13, color:'var(--text-md)' }}>
-          <a href="#features">Features</a>
-          <a href="#modes">Modes</a>
-          <a href="#tech">Tech</a>
+
+        {/* Center nav — hidden on mobile */}
+        <nav className="row" style={{ gap:24, fontSize:13, color:'var(--text-md)' }}
+          aria-label="Landing navigation">
+          <a href="#features" style={{ color:'var(--text-md)' }}>Features</a>
+          <a href="#modes" style={{ color:'var(--text-md)' }}>Modes</a>
+          <a href="#tech" style={{ color:'var(--text-md)' }}>Tech</a>
         </nav>
-        <div className="row" style={{ gap:8 }}>
+
+        {/* Right actions */}
+        <div className="row" style={{ gap:8, flexShrink:0 }}>
+          {/* Theme toggle */}
+          <button
+            className="btn btn-ghost btn-icon btn-sm"
+            onClick={toggleTheme}
+            aria-label={`Switch to ${isDark ? 'light' : 'dark'} theme`}
+            title={`Switch to ${isDark ? 'light' : 'dark'} theme`}
+          >
+            <Icon name={isDark ? 'sun' : 'moon'} size={15} />
+          </button>
           <Link href={ROUTES.login}><Button variant="ghost" size="sm">Sign in</Button></Link>
           <Link href={ROUTES.register}><Button size="sm" iconRight="arrowRight">Start playing</Button></Link>
         </div>

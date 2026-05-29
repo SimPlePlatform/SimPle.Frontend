@@ -28,16 +28,14 @@ function applyTheme(theme: Theme) {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  // Start with 'dark' on the server. The boot script already set the correct
-  // data-theme on <html> client-side before React hydrates, so the DOM is
-  // correct — we just need the React state to catch up on mount.
-  const [theme, setThemeState] = useState<Theme>('dark');
-
-  // On first client render, read the value the boot script set on <html>.
-  useEffect(() => {
-    const current = (document.documentElement.getAttribute('data-theme') as Theme) || 'dark';
-    setThemeState(current);
-  }, []);
+  // Read the value the boot script set on <html> as the initial state.
+  // The lazy initializer runs only on the client; on the server it falls
+  // back to 'dark' (matching the boot script default).
+  const [theme, setThemeState] = useState<Theme>(() =>
+    typeof document !== 'undefined'
+      ? ((document.documentElement.getAttribute('data-theme') as Theme) || 'dark')
+      : 'dark'
+  );
 
   const setTheme = useCallback((t: Theme) => {
     setThemeState(t);
