@@ -523,8 +523,10 @@ button { font: inherit; cursor: pointer; border: none; background: none; }
 }
 
 /* ─── Settings responsive ─── */
+/* Pills are hidden by default; CSS shows them on mobile so no inline style needed */
+.settings-pills { display: none; }
 @media (max-width: 768px) {
-  .settings-pills { display: flex !important; }
+  .settings-pills { display: flex; }
   .settings-layout { grid-template-columns: 1fr !important; }
   .settings-sidenav { display: none !important; }
 }
@@ -533,6 +535,11 @@ button { font: inherit; cursor: pointer; border: none; background: none; }
 @media (max-width: 1023px) {
   .auth-layout { grid-template-columns: 1fr !important; }
   .auth-left-panel { display: none !important; }
+}
+
+/* ─── Landing nav center links ─── */
+@media (max-width: 768px) {
+  .landing-center-nav { display: none !important; }
 }
 
 /* Hamburger hidden on desktop where sidebar shows */

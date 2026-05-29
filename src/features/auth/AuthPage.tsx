@@ -89,31 +89,48 @@ function AuthLeft() {
   // This panel always has a dark background regardless of the active theme,
   // so all text colours are pinned to the dark-mode palette values.
   return (
-    <div style={{ position:'relative', overflow:'hidden', background:'linear-gradient(180deg, #0A0E18 0%, #07090F 100%)', padding:48, display:'flex', flexDirection:'column', justifyContent:'space-between', color:'#F2F5FB' }}>
-      <div className="grid-bg" style={{ opacity:0.5 }} />
+    <div style={{
+      position:'relative', overflow:'hidden',
+      background:'linear-gradient(160deg, #0D1220 0%, #07090F 100%)',
+      padding:'clamp(28px,4vw,48px)',
+      display:'flex', flexDirection:'column', justifyContent:'space-between',
+      color:'#F2F5FB', minHeight:'100dvh',
+    }}>
+      {/* Subtle red accent glow */}
+      <div style={{ position:'absolute', top:'-10%', right:'-5%', width:'55%', height:'55%', borderRadius:'50%', background:'radial-gradient(circle, rgba(240,57,75,0.12) 0%, transparent 70%)', pointerEvents:'none' }} />
+      <div className="grid-bg" style={{ opacity:0.4 }} />
+
+      {/* Brand */}
       <div className="row" style={{ gap:10, zIndex:2, position:'relative' }}>
         <div className="brand__logo" style={{ width:30, height:30 }} />
         <div style={{ fontFamily:'var(--font-display)', fontWeight:600, fontSize:20, color:'#F2F5FB' }}>SimPle</div>
+        <span style={{ fontSize:10, fontFamily:'var(--font-mono)', color:'rgba(255,255,255,0.3)', marginLeft:2 }}>beta</span>
       </div>
-      <div style={{ position:'relative', zIndex:2 }}>
-        <div className="row" style={{ gap:8, marginBottom:16 }}>
+
+      {/* Hero copy */}
+      <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'center', padding:'clamp(24px,3vw,40px) 0' }}>
+        <div className="row" style={{ gap:8, marginBottom:18, flexWrap:'wrap' }}>
           <span className="chip chip--red chip--mono"><span className="dot dot--playing" />Season 4 live</span>
           <span className="chip chip--mono" style={{ background:'rgba(255,255,255,0.06)', color:'#B6BFD5', borderColor:'rgba(255,255,255,0.1)' }}>+312 today</span>
         </div>
-        <h1 className="font-display" style={{ fontSize:48, fontWeight:600, lineHeight:1.05, letterSpacing:'-0.02em', maxWidth:480, color:'#F2F5FB' }}>
+        <h1 className="font-display" style={{ fontSize:'clamp(28px,3.5vw,48px)', fontWeight:600, lineHeight:1.08, letterSpacing:'-0.02em', color:'#F2F5FB', maxWidth:460 }}>
           A premium clubhouse for sharp little games.
         </h1>
-        <p style={{ marginTop:14, maxWidth:440, color:'#B6BFD5' }}>Find your friends. Drill against AI. Climb a ladder that actually matters.</p>
-        <div style={{ marginTop:32, display:'grid', gap:8, maxWidth:420 }}>
+        <p style={{ marginTop:14, maxWidth:400, color:'#B6BFD5', fontSize:'clamp(13px,1.3vw,15px)', lineHeight:1.6 }}>
+          Find your friends. Drill against AI. Climb a ladder that actually matters.
+        </p>
+        <div style={{ marginTop:'clamp(20px,2.5vw,32px)', display:'grid', gap:8, maxWidth:420 }}>
           <ActivityRow initials="PR" color="#38BDF8" name="Priya Raman" text="started a Chess Lite lobby" when="now" />
-          <ActivityRow initials="SL" color="#34D399" name="Sara Lindqvist" text="climbed to Diamond II - +24 ELO" when="2m" />
+          <ActivityRow initials="SL" color="#34D399" name="Sara Lindqvist" text="climbed to Diamond II · +24 ELO" when="2m" />
           <ActivityRow initials="MO" color="#A78BFA" name="Mateus Oliveira" text="unlocked Tetris Sprint achievement" when="5m" />
         </div>
       </div>
-      <div className="row" style={{ gap:14, color:'#7A8299', fontSize:12, zIndex:2, position:'relative' }}>
-        <span className="row" style={{ gap:6 }}><Icon name="lock" size={12} /> End-to-end TLS</span>
-        <span className="row" style={{ gap:6 }}><Icon name="shield" size={12} /> Server-validated moves</span>
-        <span className="row" style={{ gap:6 }}><Icon name="signal" size={12} /> Region-aware</span>
+
+      {/* Footer badges */}
+      <div style={{ display:'flex', gap:16, flexWrap:'wrap', color:'#7A8299', fontSize:11.5, zIndex:2, position:'relative' }}>
+        <span className="row" style={{ gap:5 }}><Icon name="lock" size={12} /> End-to-end TLS</span>
+        <span className="row" style={{ gap:5 }}><Icon name="shield" size={12} /> Server-validated moves</span>
+        <span className="row" style={{ gap:5 }}><Icon name="signal" size={12} /> Region-aware</span>
       </div>
     </div>
   );

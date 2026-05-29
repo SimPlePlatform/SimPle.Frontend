@@ -30,16 +30,16 @@ function LandingNav() {
   const isDark = theme === 'dark';
   return (
     <div className="landing__nav">
-      <div className="container row" style={{ height:64, justifyContent:'space-between', gap:12 }}>
-        {/* Brand */}
-        <div className="row" style={{ gap:10, flexShrink:0 }}>
+      <div className="container" style={{ height:64, display:'grid', gridTemplateColumns:'1fr auto 1fr', alignItems:'center', gap:12 }}>
+        {/* Brand — left */}
+        <div className="row" style={{ gap:10 }}>
           <div className="brand__logo" style={{ width:28, height:28 }} />
           <div style={{ fontFamily:'var(--font-display)', fontWeight:600, fontSize:18, letterSpacing:'-0.02em' }}>SimPle</div>
           <span className="chip chip--mono" style={{ marginLeft:6 }}>beta</span>
         </div>
 
-        {/* Center nav — hidden on mobile */}
-        <nav className="row" style={{ gap:24, fontSize:13, color:'var(--text-md)' }}
+        {/* Center nav — truly centered, hidden on mobile */}
+        <nav className="landing-center-nav row" style={{ gap:24, fontSize:13, color:'var(--text-md)' }}
           aria-label="Landing navigation">
           <a href="#features" style={{ color:'var(--text-md)' }}>Features</a>
           <a href="#modes" style={{ color:'var(--text-md)' }}>Modes</a>
@@ -47,7 +47,7 @@ function LandingNav() {
         </nav>
 
         {/* Right actions */}
-        <div className="row" style={{ gap:8, flexShrink:0 }}>
+        <div className="row" style={{ gap:8, justifyContent:'flex-end' }}>
           {/* Theme toggle */}
           <button
             className="btn btn-ghost btn-icon btn-sm"
