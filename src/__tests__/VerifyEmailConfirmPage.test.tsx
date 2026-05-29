@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
-// ── Mocks ─────────────────────────────────────────────────────────────────────
+// -- Mocks ---------------------------------------------------------------------
 
 const MockApiError = vi.hoisted(() =>
   class extends Error {
@@ -35,7 +35,7 @@ vi.mock('@/lib/routes', () => ({
   ROUTES: { dashboard: '/dashboard', login: '/login', verifyEmail: '/verify-email' },
 }));
 
-// ── Import after mocks ────────────────────────────────────────────────────────
+// -- Import after mocks --------------------------------------------------------
 
 import { VerifyEmailConfirmPage } from '@/features/auth/VerifyEmailConfirmPage';
 
@@ -48,7 +48,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-// ── Tests ─────────────────────────────────────────────────────────────────────
+// -- Tests ---------------------------------------------------------------------
 
 describe('VerifyEmailConfirmPage', () => {
   it('shows verifying spinner immediately', () => {

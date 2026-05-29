@@ -3,7 +3,7 @@ import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
-// ── Mocks ─────────────────────────────────────────────────────────────────────
+// -- Mocks ---------------------------------------------------------------------
 
 const MockApiError = vi.hoisted(() =>
   class extends Error {
@@ -24,11 +24,11 @@ vi.mock('@/lib/api-client', () => ({
   ApiError: MockApiError,
 }));
 
-// ── Import after mocks ────────────────────────────────────────────────────────
+// -- Import after mocks --------------------------------------------------------
 
 import { GoogleOAuthButton } from '@/features/auth/GoogleOAuthButton';
 
-// ── Google GIS mock helpers ───────────────────────────────────────────────────
+// -- Google GIS mock helpers ---------------------------------------------------
 
 function setupGoogleMock() {
   const mockPrompt = vi.fn();
@@ -56,7 +56,7 @@ afterEach(() => {
   clearGoogleMock();
 });
 
-// ── Tests ─────────────────────────────────────────────────────────────────────
+// -- Tests ---------------------------------------------------------------------
 
 describe('GoogleOAuthButton', () => {
   it('renders the Google sign-in button', () => {

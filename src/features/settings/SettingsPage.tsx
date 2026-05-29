@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
@@ -136,7 +136,7 @@ function AccountSettings() {
   const toast = useToast();
   const { user, logout } = useAuth();
 
-  // â”€â”€ Profile card (Module 2) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // -- Profile card (Module 2) -----------------------------------------------
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [profileForm, setProfileForm] = useState({ displayName: '', bio: '', visibility: 'Public' as UserProfile['visibility'], profileType: 'Player' as UserProfile['profileType'] });
   const [linkForm, setLinkForm] = useState<UserProfile['links']>([]);
@@ -170,7 +170,7 @@ function AccountSettings() {
     accountApi.getSessions().then(setSessions).catch(() => {});
   }, []);
 
-  // â”€â”€ Change password â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // -- Change password -------------------------------------------------------
   const [showChangePw, setShowChangePw] = useState(false);
   const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
   const [pwLoading, setPwLoading] = useState(false);
@@ -194,7 +194,7 @@ function AccountSettings() {
     }
   };
 
-  // â”€â”€ Change email â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // -- Change email ----------------------------------------------------------
   const [showChangeEmail, setShowChangeEmail] = useState(false);
   const [newEmail, setNewEmail] = useState('');
   const [emailLoading, setEmailLoading] = useState(false);
@@ -250,7 +250,7 @@ function AccountSettings() {
     }
   };
 
-  // â”€â”€ Delete account â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // -- Delete account --------------------------------------------------------
   const [showDelete, setShowDelete] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -725,14 +725,14 @@ function AccountSettings() {
             </div>
           </>
         ) : (
-          <div style={{ fontSize: 13, color: 'var(--text-lo)', padding: '8px 0' }}>Loadingâ€¦</div>
+          <div style={{ fontSize: 13, color: 'var(--text-lo)', padding: '8px 0' }}>Loading...</div>
         )}
       </SettingCard>
 
       <SettingCard title="Login & security">
         <SettingRow
           label="Email"
-          hint={user ? `${user.email} Â· ${user.isEmailVerified ? 'verified' : 'unverified'}` : 'â€”'}
+          hint={user ? `${user.email}  -  ${user.isEmailVerified ? 'verified' : 'unverified'}` : '-'}
           right={
             showChangeEmail ? (
               <div className="row" style={{ gap: 6 }}>
@@ -744,7 +744,7 @@ function AccountSettings() {
                   style={{ width: 180 }}
                 />
                 <Button size="sm" onClick={handleChangeEmail} disabled={emailLoading || !newEmail}>
-                  {emailLoading ? 'â€¦' : 'Send link'}
+                  {emailLoading ? '...' : 'Send link'}
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => setShowChangeEmail(false)}>Cancel</Button>
               </div>
@@ -768,7 +768,7 @@ function AccountSettings() {
                   value={pwForm.confirm} onChange={e => setPwForm(f => ({ ...f, confirm: e.target.value }))} style={{ width: 220 }} />
                 <div className="row" style={{ gap: 6 }}>
                   <Button size="sm" onClick={handleChangePassword} disabled={pwLoading || !pwForm.current || !pwForm.next}>
-                    {pwLoading ? 'â€¦' : 'Update'}
+                    {pwLoading ? '...' : 'Update'}
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => setShowChangePw(false)}>Cancel</Button>
                 </div>
@@ -810,7 +810,7 @@ function AccountSettings() {
                 <Button size="sm" onClick={handleDeleteAccount}
                   disabled={deleteLoading || !deletePassword}
                   style={{ background: 'var(--danger)', borderColor: 'var(--danger)', color: '#fff' }}>
-                  {deleteLoading ? 'â€¦' : 'Delete'}
+                  {deleteLoading ? '...' : 'Delete'}
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => setShowDelete(false)}>Cancel</Button>
               </div>
@@ -826,6 +826,12 @@ function AccountSettings() {
 }
 
 function ThemeSettings() {
+  type ColorMode = 'Light' | 'Dark' | 'System';
+  const [mode, setMode] = useState<ColorMode>(() => {
+    if (typeof window === 'undefined') return 'Dark';
+    const stored = window.localStorage.getItem('simple-color-mode');
+    return stored === 'Light' || stored === 'System' ? stored : 'Dark';
+  });
   const [theme, setTheme] = useState('midnight');
   const [accent, setAccent] = useState('#F0394B');
   const [density, setDensity] = useState('Default');
@@ -834,9 +840,31 @@ function ThemeSettings() {
     { id: 'obsidian', name: 'Obsidian', a: '#070B14', b: '#10162A' },
     { id: 'slate',    name: 'Slate',    a: '#0F172A', b: '#1E293B' },
   ];
+
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-color-scheme: light)');
+    const resolved = mode === 'System' && media.matches ? 'light' : mode.toLowerCase();
+    window.localStorage.setItem('simple-color-mode', mode);
+    document.documentElement.dataset.colorMode = resolved;
+    window.dispatchEvent(new Event('simple-theme-change'));
+  }, [mode]);
+
   return (
     <>
-      <SettingCard title="Appearance" sub="Dark-first. Light coming later.">
+      <SettingCard title="Appearance" sub="Choose Light, Dark, or follow your system setting.">
+        <SettingRow label="Color mode" hint="Applies across the app on this device." right={
+          <div className="tabs">
+            {(['Light', 'Dark', 'System'] as ColorMode[]).map(item => (
+              <button
+                key={item}
+                className={`tab ${item === mode ? 'tab--active' : ''}`}
+                onClick={() => setMode(item)}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+        } />
         <div className="grid grid-3">
           {themes.map(t => (
             <button
@@ -894,12 +922,12 @@ function NotifySettings() {
   const toggle = (k: keyof typeof states) => setStates(s => ({ ...s, [k]: !s[k] }));
   return (
     <SettingCard title="Notifications" sub="Choose where and when SimPle reaches out.">
-      <SettingRow label="Lobby invites" hint="In-app Â· email" right={<Toggle on={states.lobby} onChange={() => toggle('lobby')} label="" />} />
+      <SettingRow label="Lobby invites" hint="In-app  -  email" right={<Toggle on={states.lobby} onChange={() => toggle('lobby')} label="" />} />
       <SettingRow label="Friend requests" right={<Toggle on={states.friend} onChange={() => toggle('friend')} label="" />} />
       <SettingRow label="Direct messages" hint="In-app only" right={<Toggle on={states.dm} onChange={() => toggle('dm')} label="" />} />
       <SettingRow label="Match results" hint="Win/loss summaries" right={<Toggle on={states.result} onChange={() => toggle('result')} label="" />} />
       <SettingRow label="Season announcements" right={<Toggle on={states.season} onChange={() => toggle('season')} label="" />} />
-      <SettingRow label="Email digest" hint="Weekly Â· Sunday 19:00" right={<Toggle on={states.digest} onChange={() => toggle('digest')} label="" />} />
+      <SettingRow label="Email digest" hint="Weekly  -  Sunday 19:00" right={<Toggle on={states.digest} onChange={() => toggle('digest')} label="" />} />
     </SettingCard>
   );
 }
@@ -1012,5 +1040,3 @@ function SessionsList({
     </div>
   );
 }
-
-

@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { ResetPasswordPage } from '@/features/auth/ResetPasswordPage';
 
-// ── Mocks ─────────────────────────────────────────────────────────────────────
+// -- Mocks ---------------------------------------------------------------------
 
 const MockApiError = vi.hoisted(() =>
   class extends Error {
@@ -36,7 +36,7 @@ vi.mock('@/lib/routes', () => ({
   ROUTES: { login: '/login', dashboard: '/dashboard' },
 }));
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// -- Helpers -------------------------------------------------------------------
 
 function renderPage(token = 'valid-token') {
   return render(<ResetPasswordPage token={token} />);
@@ -47,7 +47,7 @@ beforeEach(() => {
   mockResetPassword.mockResolvedValue(undefined);
 });
 
-// ── Tests ─────────────────────────────────────────────────────────────────────
+// -- Tests ---------------------------------------------------------------------
 
 describe('ResetPasswordPage', () => {
   it('renders the form with disabled submit when token is missing', () => {

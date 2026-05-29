@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
@@ -163,7 +163,7 @@ export function ProfilePage({ userId }: { userId: string }) {
     return (
       <div className="page">
         <div className="card-elev" style={{ padding: 40, textAlign: 'center', color: 'var(--text-lo)' }}>
-          Loading profileâ€¦
+          Loading profile...
         </div>
       </div>
     );
@@ -237,7 +237,7 @@ export function ProfilePage({ userId }: { userId: string }) {
                 <div className="row" style={{ gap: 6 }}>
                   <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
                   <Button size="sm" icon="check" onClick={handleSave} disabled={saveLoading}>
-                    {saveLoading ? 'â€¦' : 'Save'}
+                    {saveLoading ? '...' : 'Save'}
                   </Button>
                 </div>
               ) : (
@@ -312,7 +312,7 @@ export function ProfilePage({ userId }: { userId: string }) {
                   <>
                     <div className="font-display" style={{ fontSize: 24, fontWeight: 600 }}>{profile.displayName}</div>
                     <div className="mono" style={{ fontSize: 12, color: 'var(--text-lo)' }}>
-                      @{profile.username} Â· joined {joinedYear}{regionText ? ` Â· ${regionText}` : ''}
+                      @{profile.username}  -  joined {joinedYear}{regionText ? `  -  ${regionText}` : ''}
                     </div>
                     {profile.statusMessage && (
                       <div style={{ fontSize: 12, color: 'var(--text-md)', marginTop: 4 }}>{profile.statusMessage}</div>
@@ -358,12 +358,12 @@ export function ProfilePage({ userId }: { userId: string }) {
         </div>
       </div>
 
-      {/* Stats â€” placeholders until Module 10 */}
+      {/* Stats - placeholders until Module 10 */}
       <div className="grid grid-4" style={{ marginTop: 18 }}>
-        <StatCard label="Matches"     value="â€”"  hint="Module 10"   icon="controller" />
-        <StatCard label="Win rate"    value="â€”"  hint="Module 10"   icon="trophy" />
-        <StatCard label="Best streak" value="â€”"  hint="Module 10"   icon="flame" />
-        <StatCard label="Friends"     value="â€”"  hint="Module 3"    icon="users" accent="ice" />
+        <StatCard label="Matches"     value="-"  hint="Module 10"   icon="controller" />
+        <StatCard label="Win rate"    value="-"  hint="Module 10"   icon="trophy" />
+        <StatCard label="Best streak" value="-"  hint="Module 10"   icon="flame" />
+        <StatCard label="Friends"     value="-"  hint="Module 3"    icon="users" accent="ice" />
       </div>
 
       <div style={{ marginTop: 24 }}>

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// ── profileApi unit tests ─────────────────────────────────────────────────────
+// -- profileApi unit tests -----------------------------------------------------
 // Tests use fetch mocking to verify the API client builds correct requests.
 
 const mockFetch = vi.fn();

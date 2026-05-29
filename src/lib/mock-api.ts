@@ -14,7 +14,7 @@ import type {
 
 const delay = (ms = 300) => new Promise<void>(r => setTimeout(r, ms));
 
-// ── Auth ──────────────────────────────────────────────────────────────────────
+// -- Auth ----------------------------------------------------------------------
 export async function login(_email: string, _password: string): Promise<User> {
   await delay(700);
   return CURRENT_USER;
@@ -34,7 +34,7 @@ export async function logout(): Promise<void> {
   await delay(200);
 }
 
-// ── User profile ──────────────────────────────────────────────────────────────
+// -- User profile --------------------------------------------------------------
 export async function getUserById(id: string): Promise<User> {
   await delay(200);
   void id;
@@ -52,7 +52,7 @@ export async function searchUsers(query: string): Promise<User[]> {
   return [];
 }
 
-// ── Friends ───────────────────────────────────────────────────────────────────
+// -- Friends -------------------------------------------------------------------
 export async function getFriends(): Promise<Friend[]> {
   await delay(200);
   return FRIENDS;
@@ -88,7 +88,7 @@ export async function removeFriend(friendId: string): Promise<void> {
   void friendId;
 }
 
-// ── Games ─────────────────────────────────────────────────────────────────────
+// -- Games ---------------------------------------------------------------------
 export async function getGames(): Promise<Game[]> {
   await delay(200);
   return GAMES;
@@ -99,13 +99,13 @@ export async function getGameById(id: string): Promise<Game | undefined> {
   return GAMES.find(g => g.id === id);
 }
 
-// ── Matches ───────────────────────────────────────────────────────────────────
+// -- Matches -------------------------------------------------------------------
 export async function getRecentMatches(): Promise<Match[]> {
   await delay(200);
   return RECENT_MATCHES;
 }
 
-// ── Notifications ─────────────────────────────────────────────────────────────
+// -- Notifications -------------------------------------------------------------
 export async function getNotifications(): Promise<Notification[]> {
   await delay(100);
   return NOTIFICATIONS;
@@ -115,19 +115,19 @@ export async function markAllRead(): Promise<void> {
   await delay(200);
 }
 
-// ── Achievements ──────────────────────────────────────────────────────────────
+// -- Achievements --------------------------------------------------------------
 export async function getAchievements(): Promise<Achievement[]> {
   await delay(200);
   return ACHIEVEMENTS;
 }
 
-// ── Leaderboards ──────────────────────────────────────────────────────────────
+// -- Leaderboards --------------------------------------------------------------
 export async function getLeaderboard(_scope: 'global' | 'friends' = 'global'): Promise<LeaderboardRow[]> {
   await delay(300);
   return LEADERBOARD_GLOBAL;
 }
 
-// ── Lobbies ───────────────────────────────────────────────────────────────────
+// -- Lobbies -------------------------------------------------------------------
 export async function createLobby(gameId: string, options: Record<string, unknown> = {}): Promise<{ id: string }> {
   await delay(400);
   void gameId; void options;
