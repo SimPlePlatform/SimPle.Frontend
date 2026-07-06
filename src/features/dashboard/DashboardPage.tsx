@@ -1,6 +1,7 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ApiError } from '@/lib/api-client';
 import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
 import { StatCard } from '@/components/ui/StatCard';
@@ -9,25 +10,53 @@ import { Icon } from '@/components/ui/Icons';
 import { CreateLobbyModal } from '@/components/lobby/CreateLobbyModal';
 import { InviteFriendModal } from '@/components/friends/InviteFriendModal';
 import { CURRENT_USER } from '@/mock/users';
-import { FRIENDS } from '@/mock/friends';
 import { GAMES } from '@/mock/games';
 import { RECENT_MATCHES } from '@/mock/matches';
 import { NOTIFICATIONS } from '@/mock/notifications';
 import { ROUTES } from '@/lib/routes';
+import { friendsApi } from '@/features/friends/friendsApi';
+import { useFriendSummary } from '@/features/friends/FriendSummaryContext';
+import type { FriendDto } from '@/features/friends/types';
 
 export function DashboardPage() {
   const u = CURRENT_USER;
   const router = useRouter();
   const [lobbyOpen, setLobbyOpen]   = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
-  const onlineFriends = FRIENDS.filter(f => f.status === 'online' || f.status === 'playing');
+
+  const { summary, loading: summaryLoading, error: summaryError } = useFriendSummary();
+
+  const [friends, setFriends]               = useState<FriendDto[]>([]);
+  const [friendsLoading, setFriendsLoading] = useState(true);
+  const [friendsError, setFriendsError]     = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    friendsApi.getFriends({ limit: 10 })
+      .then(r => { if (!cancelled) setFriends(r.items); })
+      .catch(e => { if (!cancelled) setFriendsError(e instanceof ApiError ? e.message : 'Failed to load friends.'); })
+      .finally(() => { if (!cancelled) setFriendsLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const inviteCount = NOTIFICATIONS.filter(n => n.kind === 'invite').length;
+
+  const subtitleFriends = summaryLoading || (!summary && !summaryError)
+    ? '…'
+    : summaryError
+      ? null
+      : summary?.friendCount ?? null;
 
   return (
     <div className="page">
       <div className="between" style={{ flexWrap:'wrap', gap:12 }}>
         <div>
           <div className="page-title">Good evening, {u.display.split(' ')[0]}.</div>
-          <div className="page-sub">{onlineFriends.length} friends online · {NOTIFICATIONS.filter(n => n.kind === 'invite').length} invite waiting</div>
+          <div className="page-sub">
+            {subtitleFriends !== null
+              ? `${subtitleFriends} friends · ${inviteCount} invite waiting`
+              : `${inviteCount} invite waiting`}
+          </div>
         </div>
         <div className="row" style={{ gap:8 }}>
           <Button variant="ghost" icon="ai" onClick={() => router.push(ROUTES.games)}>Play vs AI</Button>
@@ -39,7 +68,7 @@ export function DashboardPage() {
       {/* Hero + side panel */}
       <div style={{ display:'grid', gridTemplateColumns:'1.6fr 1fr', gap:18, marginTop:24 }}>
         <HeroPanel />
-        <SideQuickPanel />
+        <SideQuickPanel summary={summary} summaryLoading={summaryLoading} summaryError={summaryError} />
       </div>
 
       {/* Stats */}
@@ -82,7 +111,7 @@ export function DashboardPage() {
 
       {/* Friends + Matches */}
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:18, marginTop:28 }}>
-        <OnlineFriendsPanel />
+        <FriendsPanel friends={friends} loading={friendsLoading} error={friendsError} summary={summary} />
         <RecentMatchesPanel />
       </div>
 
@@ -147,11 +176,17 @@ function HeroPanel() {
   );
 }
 
-function SideQuickPanel() {
+interface SideQuickPanelProps {
+  summary: { incomingRequestCount: number } | null;
+  summaryLoading: boolean;
+  summaryError: string | null;
+}
+
+function SideQuickPanel({ summary, summaryLoading, summaryError }: SideQuickPanelProps) {
   return (
     <div className="col" style={{ gap:18 }}>
       <DailyQuestsCard />
-      <PendingInvitesCard />
+      <PendingInvitesCard summary={summary} summaryLoading={summaryLoading} summaryError={summaryError} />
     </div>
   );
 }
@@ -189,8 +224,18 @@ function DailyQuestsCard() {
   );
 }
 
-function PendingInvitesCard() {
+interface PendingInvitesCardProps {
+  summary: { incomingRequestCount: number } | null;
+  summaryLoading: boolean;
+  summaryError: string | null;
+}
+
+function PendingInvitesCard({ summary, summaryLoading, summaryError }: PendingInvitesCardProps) {
   const router = useRouter();
+  const pendingCount = (!summaryLoading && !summaryError && summary)
+    ? summary.incomingRequestCount
+    : null;
+
   return (
     <div className="card" style={{ padding:18 }}>
       <div className="row between">
@@ -210,39 +255,59 @@ function PendingInvitesCard() {
           <Button size="sm" variant="ghost" style={{ flex:1 }}>Decline</Button>
         </div>
       </div>
-      <div className="row" style={{ marginTop:12, gap:8 }}>
-        <Icon name="bell" size={14} style={{ color:'var(--text-lo)' }} />
-        <span style={{ fontSize:12, color:'var(--text-lo)' }}>2 friend requests pending</span>
-      </div>
+      {pendingCount !== null && pendingCount > 0 && (
+        <div className="row" style={{ marginTop:12, gap:8 }}>
+          <Icon name="bell" size={14} style={{ color:'var(--text-lo)' }} />
+          <span style={{ fontSize:12, color:'var(--text-lo)' }}>
+            {pendingCount} friend request{pendingCount !== 1 ? 's' : ''} pending
+          </span>
+        </div>
+      )}
     </div>
   );
 }
 
-function OnlineFriendsPanel() {
+interface FriendsPanelProps {
+  friends: FriendDto[];
+  loading: boolean;
+  error: string | null;
+  summary: { friendCount: number } | null;
+}
+
+function FriendsPanel({ friends, loading, error, summary }: FriendsPanelProps) {
   const router = useRouter();
-  const online = FRIENDS.filter(f => f.status !== 'offline').slice(0, 5);
+  const visible = friends.slice(0, 5);
+
   return (
     <div className="card" style={{ padding:18 }}>
       <div className="row between">
         <div>
-          <div style={{ fontFamily:'var(--font-display)', fontWeight:600, fontSize:14 }}>Friends online</div>
-          <div className="mono" style={{ fontSize:11, color:'var(--text-lo)' }}>{online.length} of {FRIENDS.length}</div>
+          <div style={{ fontFamily:'var(--font-display)', fontWeight:600, fontSize:14 }}>Friends</div>
+          <div className="mono" style={{ fontSize:11, color:'var(--text-lo)' }}>
+            {summary !== null ? `${summary.friendCount} total` : '—'}
+          </div>
         </div>
         <Button size="sm" variant="ghost" iconRight="chevronRight" onClick={() => router.push(ROUTES.friends)}>View all</Button>
       </div>
       <div className="col" style={{ marginTop:12, gap:6 }}>
-        {online.map(f => (
-          <div key={f.id} className="row" style={{ padding:'10px 8px', borderRadius:10, gap:12 }}>
-            <Avatar user={f} showPresence />
+        {loading ? (
+          <div role="status" style={{ padding:16, color:'var(--text-lo)', fontSize:13 }}>Loading…</div>
+        ) : error ? (
+          <div style={{ padding:8, fontSize:13, color:'var(--danger)' }}>{error}</div>
+        ) : visible.length === 0 ? (
+          <div style={{ fontSize:13, color:'var(--text-lo)' }}>No friends yet. Add some on the Friends page.</div>
+        ) : visible.map(f => (
+          <div key={f.userId} className="row" style={{ padding:'10px 8px', borderRadius:10, gap:12 }}>
+            <Avatar src={f.avatarUrl} user={{ initials:f.initials, color:f.color }} />
             <div style={{ flex:1, minWidth:0 }}>
               <div className="row" style={{ gap:8 }}>
-                <span style={{ fontSize:13, fontWeight:600 }}>{f.display}</span>
-                <span className="chip chip--mono" style={{ height:18, padding:'0 6px', fontSize:10 }}>{f.elo}</span>
+                <span style={{ fontSize:13, fontWeight:600 }}>{f.displayName}</span>
+                {/* ELO chip hidden until M10 supplies authoritative ratings */}
               </div>
-              <div className="mono" style={{ fontSize:11, color:'var(--text-lo)' }}>{f.activity}</div>
+              <div className="mono" style={{ fontSize:11, color:'var(--text-lo)' }}>@{f.username}</div>
             </div>
-            <Button size="sm" variant="ghost" icon="message" />
-            <Button size="sm" variant="ghost" icon="plus">Invite</Button>
+            <Button size="sm" variant="ghost" icon="message" disabled aria-disabled="true" />
+            <Button size="sm" variant="ghost" icon="plus" disabled aria-disabled="true">Invite</Button>
           </div>
         ))}
       </div>

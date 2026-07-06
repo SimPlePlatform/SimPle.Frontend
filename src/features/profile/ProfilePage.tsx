@@ -363,7 +363,7 @@ export function ProfilePage({ userId }: { userId: string }) {
         <StatCard label="Matches"     value="—"  hint="Module 10"   icon="controller" />
         <StatCard label="Win rate"    value="—"  hint="Module 10"   icon="trophy" />
         <StatCard label="Best streak" value="—"  hint="Module 10"   icon="flame" />
-        <StatCard label="Friends"     value="—"  hint="Module 3"    icon="users" accent="ice" />
+        <StatCard label="Friends"     value={profile ? String(profile.friendCount) : '—'}  icon="users" accent="ice" />
       </div>
 
       <div style={{ marginTop: 24 }}>

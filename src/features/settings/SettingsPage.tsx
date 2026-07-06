@@ -10,6 +10,9 @@ import { accountApi, type Session } from '@/features/auth/accountApi';
 import { ApiError } from '@/lib/api-client';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { profileApi, type UserProfile, type UsernameChangeRequest } from '@/features/profile/profileApi';
+import { friendsApi } from '@/features/friends/friendsApi';
+import { friendsErrorMessage } from '@/features/friends/friendsErrors';
+import type { BlockDto } from '@/features/friends/types';
 
 const LINK_PLATFORMS = [
   { value: 'github',    label: 'GitHub' },
@@ -517,11 +520,6 @@ function AccountSettings() {
                 <option value="FriendsOnly">Friends-only</option>
                 <option value="Private">Private</option>
               </select>
-              {profileForm.visibility === 'FriendsOnly' && (
-                <div style={{ fontSize: 12, color: 'var(--text-lo)', marginTop: 6 }}>
-                  Friends-only visibility is saved now. Until the friends module is implemented, it behaves like private.
-                </div>
-              )}
             </Field>
             <Field label="Profile type" style={{ marginTop: 12 }}>
               <select className="input" value={profileForm.profileType}
@@ -923,22 +921,68 @@ function NotifySettings() {
 
 function PrivacySettings() {
   const toast = useToast();
+
+  // Profile visibility (separate from friend request privacy)
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [onlineStatus, setOnlineStatus] = useState(true);
+
+  // Friend request privacy
+  const [privacy, setPrivacy]           = useState<'Anyone' | 'FriendsOfFriends' | 'Off' | null>(null);
+  const [privacyLoading, setPrivacyLoading] = useState(true);
+  const [privacySaving, setPrivacySaving]   = useState(false);
+  const [privacyError, setPrivacyError]     = useState<string | null>(null);
+  const [privacyRev, setPrivacyRev]         = useState(0);
+
+  // Block count hint
+  const [blockCount, setBlockCount]         = useState<number | null>(null);
+  const [blockCountAtLeast, setBlockCountAtLeast] = useState(false);
+  const [blockCountError, setBlockCountError] = useState(false);
+
+  // Block list (keyset cursor)
+  const [blocks, setBlocks]               = useState<BlockDto[]>([]);
+  const [blocksCursor, setBlocksCursor]   = useState<string | null>(null);
+  const [loadingBlocks, setLoadingBlocks]         = useState(false);
+  const [loadingMoreBlocks, setLoadingMoreBlocks] = useState(false);
+  const [blocksError, setBlocksError]     = useState<string | null>(null);
+  const [showBlockList, setShowBlockList] = useState(false);
+  const [pendingUnblock, setPendingUnblock] = useState<Record<string, boolean>>({});
+
   useEffect(() => {
     profileApi.getMe().then(setProfile).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPrivacyLoading(true);
+     
+    setPrivacyError(null);
+    friendsApi.getSettings()
+      .then(s => { if (!cancelled) setPrivacy(s.friendRequestPrivacy); })
+      .catch(e => { if (!cancelled) setPrivacyError(e instanceof ApiError ? e.message : 'Could not load privacy settings.'); })
+      .finally(() => { if (!cancelled) setPrivacyLoading(false); });
+    return () => { cancelled = true; };
+  }, [privacyRev]);
+
+  useEffect(() => {
+    let cancelled = false;
+    // Cursor lists promise no total; derive an approximate count from the first page.
+    friendsApi.getBlocks({ limit: 20 })
+      .then(r => {
+        if (cancelled) return;
+        setBlockCount(r.items.length);
+        setBlockCountAtLeast(r.nextCursor != null);
+      })
+      .catch(() => { if (!cancelled) setBlockCountError(true); });
+    return () => { cancelled = true; };
   }, []);
 
   const setVisibility = async (visibility: UserProfile['visibility']) => {
     if (!profile) return;
     try {
       const updated = await profileApi.updateMe({
-        displayName: profile.displayName,
-        bio: profile.bio,
-        region: profile.region,
-        statusMessage: profile.statusMessage,
-        visibility,
-        profileType: profile.profileType,
+        displayName: profile.displayName, bio: profile.bio,
+        region: profile.region, statusMessage: profile.statusMessage,
+        visibility, profileType: profile.profileType,
       });
       setProfile(updated);
       toast.push({ kind: 'success', title: 'Visibility updated.' });
@@ -946,6 +990,55 @@ function PrivacySettings() {
       toast.push({ kind: 'default', title: e instanceof ApiError ? e.message : 'Could not update visibility.' });
     }
   };
+
+  const handlePrivacyChange = async (newPrivacy: 'Anyone' | 'FriendsOfFriends' | 'Off') => {
+    if (privacySaving || privacyLoading) return;
+    setPrivacySaving(true);
+    try {
+      const s = await friendsApi.updateSettings(newPrivacy);
+      setPrivacy(s.friendRequestPrivacy);
+      toast.push({ kind: 'success', title: 'Privacy updated.' });
+    } catch (e) {
+      toast.push({ kind: 'default', title: e instanceof ApiError ? e.message : 'Could not update privacy.' });
+    } finally {
+      setPrivacySaving(false);
+    }
+  };
+
+  const loadBlocks = async (cursor: string | null, reset: boolean) => {
+    if (reset) { setLoadingBlocks(true); } else { setLoadingMoreBlocks(true); }
+    if (reset) setBlocksError(null);
+    try {
+      const r = await friendsApi.getBlocks({ cursor: cursor ?? undefined, limit: 20 });
+      setBlocks(prev => reset ? r.items : [...prev, ...r.items]);
+      setBlocksCursor(r.nextCursor);
+    } catch (e) {
+      setBlocksError(e instanceof ApiError ? e.message : 'Could not load block list.');
+    } finally {
+      setLoadingBlocks(false);
+      setLoadingMoreBlocks(false);
+    }
+  };
+
+  const handleUnblock = async (userId: string) => {
+    setPendingUnblock(p => ({ ...p, [userId]: true }));
+    try {
+      await friendsApi.unblockUser(userId);
+      setBlocks(prev => prev.filter(b => b.blockedUserId !== userId));
+      setBlockCount(prev => prev !== null ? Math.max(0, prev - 1) : null);
+      toast.push({ kind: 'success', title: 'Unblocked', body: 'User removed from your block list.' });
+    } catch (e) {
+      toast.push({ kind: 'default', title: 'Error', body: friendsErrorMessage(e) });
+    } finally {
+      setPendingUnblock(p => { const n = { ...p }; delete n[userId]; return n; });
+    }
+  };
+
+  const blockHintText = blockCountError
+    ? '— blocked players'
+    : blockCount !== null
+      ? `${blockCount}${blockCountAtLeast ? '+' : ''} blocked player${blockCount === 1 && !blockCountAtLeast ? '' : 's'}`
+      : '—';
 
   return (
     <SettingCard title="Privacy" sub="Control who sees you and what they see.">
@@ -956,20 +1049,81 @@ function PrivacySettings() {
           <button className={`tab ${profile?.visibility === 'Private' ? 'tab--active' : ''}`} onClick={() => void setVisibility('Private')}>Private</button>
         </div>
       } />
-      {profile?.visibility === 'FriendsOnly' && (
-        <div style={{ fontSize: 12, color: 'var(--text-lo)', padding: '0 0 10px' }}>
-          Friends-only visibility is saved now. Until the friends module is implemented, it behaves like private.
-        </div>
-      )}
-      <SettingRow label="Show online status" hint="Friends always see you online" right={<Toggle on={onlineStatus} onChange={setOnlineStatus} label="" />} />
+
+      {/* Show online status toggle — deferred to Module 7 (requires presence system) */}
+
       <SettingRow label="Allow friend requests from" right={
         <div className="tabs">
-          {['Anyone', 'Friends-of-friends', 'Off'].map(d => (
-            <button key={d} className={`tab ${d === 'Friends-of-friends' ? 'tab--active' : ''}`}>{d}</button>
-          ))}
+          {(['Anyone', 'FriendsOfFriends', 'Off'] as const).map(v => {
+            const label = v === 'FriendsOfFriends' ? 'Friends-of-friends' : v;
+            return (
+              <button
+                key={v}
+                className={`tab ${privacy === v ? 'tab--active' : ''}`}
+                disabled={privacyLoading || privacySaving}
+                onClick={() => void handlePrivacyChange(v)}
+              >{label}</button>
+            );
+          })}
         </div>
       } />
-      <SettingRow label="Block list" hint="0 blocked players" right={<Button size="sm" variant="ghost">Manage</Button>} />
+      {privacyError && (
+        <div style={{ fontSize: 12, color: 'var(--danger)', padding: '0 0 8px' }}>
+          {privacyError}{' '}
+          <button
+            onClick={() => { setPrivacyError(null); setPrivacyRev(r => r + 1); }}
+            style={{ color: 'var(--ice-400)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}
+          >Retry</button>
+        </div>
+      )}
+
+      <SettingRow label="Block list" hint={blockHintText} right={
+        <Button
+          size="sm" variant="ghost"
+          aria-expanded={showBlockList}
+          aria-controls="friend-block-list"
+          onClick={() => {
+            setShowBlockList(v => !v);
+            if (!showBlockList && blocks.length === 0) loadBlocks(null, true);
+          }}
+        >Manage</Button>
+      } />
+
+      {showBlockList && (
+        <div id="friend-block-list" style={{ marginTop: 4, borderTop: '1px solid var(--border-1)', paddingTop: 12 }}>
+          {loadingBlocks ? (
+            <div style={{ fontSize: 13, color: 'var(--text-lo)', padding: '8px 0' }}>Loading…</div>
+          ) : blocksError ? (
+            <div style={{ padding: '8px 0' }}>
+              <span style={{ fontSize: 13, color: 'var(--danger)' }}>{blocksError}</span>{' '}
+              <Button size="sm" variant="ghost" onClick={() => loadBlocks(null, true)}>Retry</Button>
+            </div>
+          ) : blocks.length === 0 ? (
+            <div style={{ fontSize: 12, color: 'var(--text-lo)' }}>No blocked players.</div>
+          ) : (
+            <div className="col" style={{ gap: 4 }}>
+              {blocks.map(b => (
+                <div key={b.blockedUserId} className="row" style={{ padding: '8px 0', gap: 10, borderTop: '1px solid var(--border-1)' }}>
+                  <Avatar src={b.blockedAvatarUrl} user={{ initials: b.blockedInitials, color: b.blockedColor }} size="sm" />
+                  <span style={{ flex: 1, fontSize: 13 }}>{b.blockedDisplayName}</span>
+                  <Button
+                    size="sm" variant="ghost"
+                    disabled={!!pendingUnblock[b.blockedUserId]}
+                    onClick={() => handleUnblock(b.blockedUserId)}
+                  >
+                    {pendingUnblock[b.blockedUserId] ? 'Unblocking…' : 'Unblock'}
+                  </Button>
+                </div>
+              ))}
+              {blocksCursor != null && (
+                <Button size="sm" variant="ghost" disabled={loadingMoreBlocks} onClick={() => loadBlocks(blocksCursor, false)}>
+                  {loadingMoreBlocks ? 'Loading…' : 'Load more'}
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </SettingCard>
   );
 }

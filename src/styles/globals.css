@@ -684,4 +684,37 @@ button { font: inherit; cursor: pointer; border: none; background: none; }
 [data-theme="light"] .chip--success { color: var(--success); }
 [data-theme="light"] .chip--warn { color: var(--warning); }
 
+/* ─── Friends page layout ─── */
+.friends-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 18px;
+  margin-top: 22px;
+}
+
+@media (max-width: 900px) {
+  .friends-grid { grid-template-columns: 1fr; }
+}
+
+/* Friend list row — fixed columns, mobile-responsive */
+.friend-row {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  border-radius: 10px;
+  gap: 12px;
+}
+
+.friend-row__status  { width: 160px; }
+.friend-row__elo     { width: 80px; text-align: right; font-variant-numeric: tabular-nums; }
+.friend-row__actions { width: 170px; display: flex; justify-content: flex-end; gap: 6px; }
+.friend-row__secondary { display: flex; gap: 6px; }
+
+@media (max-width: 900px) {
+  .friend-row__status    { display: none; }
+  .friend-row__elo       { display: none; }
+  .friend-row__secondary { display: none; }
+  /* .friend-row__actions is intentionally NOT hidden — More button must remain reachable on mobile */
+}
+
 [data-theme="light"] :focus-visible { outline-color: var(--border-focus); }
