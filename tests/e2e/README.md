@@ -17,6 +17,21 @@ npm run test:e2e
 ```
 Set `E2E_USER` / `E2E_PASSWORD` env vars for the sign-in test (local test creds only — never production).
 
+### Module 3 (friends & social graph) one-time seed
+`module-03-friends.spec.ts` requires three local accounts (`E2E_USER_A/B/C`, `E2E_HANDLE_A/B/C`,
+`E2E_PASSWORD_A/B/C` env vars — see the spec header for defaults) plus B having `E2E_FRIEND_COUNT`
+(default 24) other accepted friends already seeded, so the spec can prove Friends-list drill-down
+pagination (first page of 20, then the remainder via cursor) without duplicates. Run once, before the
+first execution of this spec:
+```
+node tests/e2e/seed-b-friends.mjs
+```
+It registers the filler accounts and user C via the backend's dev CAPTCHA bypass (`Recaptcha.DevBypassToken`
+in `appsettings.Development.json` — copy it from `appsettings.Development.example.json` if not already
+set locally) and creates/accepts the friendships. It's idempotent (safe to re-run) and slow on first run
+(~8-9 minutes) because account registration is rate-limited to 3/min/IP. Never run it against a
+deployed/production backend.
+
 ## How to extend per module
 Each module adds one happy-path spec named `module-XX-<slug>.spec.ts` that:
 1. signs in (reuse the helper in `smoke.spec.ts`),
