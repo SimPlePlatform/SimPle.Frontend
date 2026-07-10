@@ -1,6 +1,5 @@
 'use client';
 import React from 'react';
-import type { Game } from '@/types';
 
 function ArtPattern({ kind, a }: { kind: string; a: string }) {
   if (kind === 'sudoku') return (
@@ -13,14 +12,14 @@ function ArtPattern({ kind, a }: { kind: string; a: string }) {
       <text x="138" y="80" fill="#fff" fontFamily="JetBrains Mono" fontSize="20" fontWeight="500" opacity="0.7">3</text>
     </svg>
   );
-  if (kind === 'tetris') return (
+  if (kind === 'falling-blocks') return (
     <svg viewBox="0 0 200 140" preserveAspectRatio="xMidYMid slice" style={{ position:'absolute', inset:0, width:'100%', height:'100%' }}>
       {[[20,60],[40,60],[60,60],[40,40]].map(([x,y],i) => <rect key={i} x={x} y={y} width="18" height="18" rx="3" fill={a} opacity="0.9" />)}
       {[[100,80],[120,80],[120,60],[140,60]].map(([x,y],i) => <rect key={`b${i}`} x={x} y={y} width="18" height="18" rx="3" fill="#A78BFA" opacity="0.8" />)}
       {[[160,30],[160,50],[160,70],[160,90]].map(([x,y],i) => <rect key={`c${i}`} x={x} y={y} width="18" height="18" rx="3" fill="#FBBF24" opacity="0.65" />)}
     </svg>
   );
-  if (kind === 'c4') return (
+  if (kind === 'four-in-a-row') return (
     <svg viewBox="0 0 200 140" preserveAspectRatio="xMidYMid slice" style={{ position:'absolute', inset:0, width:'100%', height:'100%' }}>
       {Array.from({length:5}).map((_,r) => Array.from({length:7}).map((_2,c) => {
         const v = (r+c) % 5;
@@ -48,7 +47,7 @@ function ArtPattern({ kind, a }: { kind: string; a: string }) {
       }))}
     </svg>
   );
-  if (kind === 'word') {
+  if (kind === 'five-letter') {
     const word = ['S','I','M','P','L','E'];
     return (
       <svg viewBox="0 0 200 140" preserveAspectRatio="xMidYMid slice" style={{ position:'absolute', inset:0, width:'100%', height:'100%' }}>
@@ -75,29 +74,40 @@ function ArtPattern({ kind, a }: { kind: string; a: string }) {
       <circle cx="180" cy="40" r="6" fill="#F0394B" />
     </svg>
   );
-  return null;
+  // Neutral fallback for an unrecognized art token — never renders nothing (broken-media state).
+  return (
+    <svg viewBox="0 0 200 140" preserveAspectRatio="xMidYMid slice" style={{ position:'absolute', inset:0, width:'100%', height:'100%' }}>
+      {Array.from({ length: 5 }).map((_, r) => Array.from({ length: 8 }).map((_2, c) => (
+        <circle key={`${r}-${c}`} cx={c * 24 + 20} cy={r * 22 + 18} r="2.5" fill={`${a}33`} />
+      )))}
+    </svg>
+  );
+}
+
+interface GameArtGame {
+  artToken: string;
+  artColorA: string;
+  artColorB: string;
+  artAltText: string;
+  name: string;
 }
 
 interface GameArtProps {
-  game: Pick<Game, 'art' | 'name' | 'tag' | 'online'>;
+  game: GameArtGame;
+  /** Short derived line under the name, e.g. "Puzzle · Logic" — never a fabricated stat. */
+  subtitle?: string;
   h?: number | string;
 }
 
-export function GameArt({ game, h = 140 }: GameArtProps) {
-  const { kind, a, b } = game.art;
+export function GameArt({ game, subtitle, h = 140 }: GameArtProps) {
+  const { artToken: kind, artColorA: a, artColorB: b, artAltText } = game;
   const bg = `radial-gradient(120% 80% at 80% 10%, ${a}33, transparent 60%), linear-gradient(180deg, ${b}, #07090F)`;
   return (
-    <div className="tile-art" style={{ height: h, background: bg }}>
+    <div className="tile-art" role="img" aria-label={artAltText} style={{ height: h, background: bg }}>
       <ArtPattern kind={kind} a={a} />
       <div style={{ position:'absolute', inset:0, padding:14, display:'flex', flexDirection:'column', justifyContent:'flex-end', zIndex:2 }}>
         <div style={{ fontFamily:'var(--font-display)', fontWeight:600, fontSize:18, color:'#fff', letterSpacing:'-0.02em' }}>{game.name}</div>
-        <div style={{ fontSize:11.5, color:'rgba(255,255,255,0.65)', marginTop:2 }}>{game.tag}</div>
-      </div>
-      <div style={{ position:'absolute', top:10, left:10, zIndex:2 }}>
-        <span className="chip chip--mono" style={{ background:'rgba(10,14,24,0.55)', borderColor:'rgba(255,255,255,0.08)', color:'#fff' }}>
-          <span className="dot dot--online" style={{ width:6, height:6, boxShadow:'none' }} />
-          {game.online.toLocaleString()} online
-        </span>
+        {subtitle && <div style={{ fontSize:11.5, color:'rgba(255,255,255,0.65)', marginTop:2 }}>{subtitle}</div>}
       </div>
     </div>
   );
