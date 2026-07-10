@@ -14,7 +14,8 @@ export async function signIn(page: Page): Promise<void> {
   await page.goto('/login');
   await page.getByLabel(/email|username/i).first().fill(E2E_USER);
   await page.getByLabel(/password/i).first().fill(E2E_PASSWORD);
-  await page.getByRole('button', { name: /sign in|log in|login/i }).click();
+  // Exact match: a broad /sign in/i also matches the "Sign in with Google" button.
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   // Landed on an authenticated surface (not still on /login).
   await expect(page).not.toHaveURL(/\/login/);
 }
