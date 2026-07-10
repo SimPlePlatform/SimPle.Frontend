@@ -1,7 +1,36 @@
 import { apiFetch } from '@/lib/api-client';
+import type { CursorPage } from '@/features/friends/types';
 
 export type ProfileVisibility = 'Public' | 'FriendsOnly' | 'Private';
 export type ProfileType = 'Player' | 'Developer';
+
+/** Exactly one of these six — BlockedByTarget is never returned (404s instead). */
+export type RelationshipState =
+  | 'Self'
+  | 'None'
+  | 'IncomingPending'
+  | 'OutgoingPending'
+  | 'Friends'
+  | 'BlockedBySelf';
+
+/** Minimal identity shape shared by friend/mutual-friend list rows. Never carries bio/links/elo/level/presence. */
+export interface PublicIdentity {
+  userId: string;
+  username: string;
+  displayName: string;
+  initials: string;
+  color: string;
+  avatarUrl: string | null;
+  profileType: ProfileType;
+}
+
+export interface ProfileViewerContext {
+  relationshipState: RelationshipState;
+  visibleMutualFriendCount: number;
+  canViewFriends: boolean;
+  visibleFriendCount: number | null;
+  allowedActions: string[];
+}
 
 export interface ExternalLink {
   id: string;
@@ -30,6 +59,7 @@ export interface UserProfile {
   role: string;
   level: number;
   elo: number;
+  friendCount: number;
   joinedAt: string;
   links: ExternalLink[];
   interests: string[];
@@ -102,6 +132,28 @@ export const profileApi = {
 
   getPublic: (username: string) =>
     apiFetch<UserProfile>(`/api/profile/${encodeURIComponent(username)}`),
+
+  getViewerContext: (username: string) =>
+    apiFetch<ProfileViewerContext>(`/api/profile/${encodeURIComponent(username)}/viewer-context`),
+
+  getFriendsList: (username: string, params?: { query?: string; limit?: number; cursor?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.query) qs.set('query', params.query);
+    if (params?.limit != null) qs.set('limit', String(params.limit));
+    if (params?.cursor) qs.set('cursor', params.cursor);
+    const suffix = qs.toString();
+    return apiFetch<CursorPage<PublicIdentity>>(
+      `/api/profile/${encodeURIComponent(username)}/friends${suffix ? `?${suffix}` : ''}`);
+  },
+
+  getMutualFriendsList: (username: string, params?: { limit?: number; cursor?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.limit != null) qs.set('limit', String(params.limit));
+    if (params?.cursor) qs.set('cursor', params.cursor);
+    const suffix = qs.toString();
+    return apiFetch<CursorPage<PublicIdentity>>(
+      `/api/profile/${encodeURIComponent(username)}/mutual-friends${suffix ? `?${suffix}` : ''}`);
+  },
 
   getLinks: () =>
     apiFetch<ExternalLink[]>('/api/profile/me/links'),

@@ -6,7 +6,7 @@ const CSRF_HEADER = { 'X-Requested-With': 'XMLHttpRequest' };
 type Method = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
 
 interface ErrorResponse {
-  error?: { code?: string; message?: string };
+  error?: { code?: string; message?: string; retryAfterUtc?: string };
   errors?: Record<string, string[]>;
 }
 
@@ -16,6 +16,8 @@ export class ApiError extends Error {
     readonly code: string,
     message: string,
     readonly validationErrors?: Record<string, string[]>,
+    /** Present on cooldown (409 Friends.RequestCooldown) / rate-limit (429) responses — ISO 8601 UTC. */
+    readonly retryAfterUtc?: string,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -54,6 +56,7 @@ export async function apiFetch<T>(path: string, method: Method = 'GET', body?: u
       result.error?.code ?? `http_${response.status}`,
       safeErrorMessage(response.status, result),
       result.errors,
+      result.error?.retryAfterUtc,
     );
   }
 

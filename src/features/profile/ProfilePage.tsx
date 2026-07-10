@@ -1,19 +1,20 @@
 'use client';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
 import { Icon } from '@/components/ui/Icons';
 import { StatCard } from '@/components/ui/StatCard';
-import { GameArt } from '@/components/ui/GameArt';
 import { Tabs } from '@/components/ui/Tabs';
+import { Modal } from '@/components/ui/Modal';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { useToast } from '@/components/ui/Toast';
-import { GAMES } from '@/mock/games';
-import { RECENT_MATCHES } from '@/mock/matches';
-import { ACHIEVEMENTS } from '@/mock/achievements';
-import { rarityBg, rarityFg } from '@/lib/utils';
-import { profileApi, type UserProfile } from '@/features/profile/profileApi';
+import { profileApi, type UserProfile, type ProfileViewerContext, type RelationshipState } from '@/features/profile/profileApi';
+import { friendsApi } from '@/features/friends/friendsApi';
+import { friendsErrorMessage } from '@/features/friends/friendsErrors';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { ApiError } from '@/lib/api-client';
+import { ROUTES } from '@/lib/routes';
 
 const VISIBILITY_STYLES: Record<string, { label: string; color: string; bg: string }> = {
   Public:      { label: 'Public',       color: '#34D399', bg: 'rgba(52,211,153,0.12)' },
@@ -36,13 +37,15 @@ function VisibilityBadge({ visibility }: { visibility: string }) {
   );
 }
 
-export function ProfilePage({ userId }: { userId: string }) {
+export function ProfilePage({ username }: { username: string }) {
   const { user: authUser } = useAuth();
   const toast = useToast();
   const [tab, setTab] = useState('overview');
   const [editing, setEditing] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [viewerContext, setViewerContext] = useState<ProfileViewerContext | null>(null);
   const [loading, setLoading] = useState(true);
+  const [notFoundMessage, setNotFoundMessage] = useState<string | null>(null);
   const [saveLoading, setSaveLoading] = useState(false);
   const [mediaLoading, setMediaLoading] = useState<'avatar' | 'banner' | null>(null);
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
@@ -50,25 +53,41 @@ export function ProfilePage({ userId }: { userId: string }) {
   const [editForm, setEditForm] = useState({ displayName: '', bio: '' });
   const [localAvatarColor, setLocalAvatarColor] = useState<string | null>(null);
   const [localBannerColor, setLocalBannerColor] = useState<string | null>(null);
+  const [actionPending, setActionPending] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<'remove' | 'block' | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
+  const loadSeq = useRef(0);
 
-  const isOwn = authUser?.id === userId;
+  const isOwn = authUser?.username === username;
 
-  useEffect(() => {
-    let cancelled = false;
-    (isOwn ? profileApi.getMe() : profileApi.getPublic(userId))
-      .then(data => {
-        if (cancelled) return;
+  const load = useCallback(() => {
+    const seq = ++loadSeq.current;
+    setLoading(true);
+    setNotFoundMessage(null);
+    Promise.all([
+      isOwn ? profileApi.getMe() : profileApi.getPublic(username),
+      authUser ? profileApi.getViewerContext(username).catch(() => null) : Promise.resolve(null),
+    ])
+      .then(([data, vc]) => {
+        if (seq !== loadSeq.current) return;
         setProfile(data);
+        setViewerContext(vc);
         setEditForm({ displayName: data.displayName, bio: data.bio ?? '' });
         setLocalAvatarColor(data.color);
         setLocalBannerColor(data.bannerFallbackColor);
         setLoading(false);
       })
-      .catch(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [userId, isOwn]);
+      .catch(e => {
+        if (seq !== loadSeq.current) return;
+        setProfile(null);
+        setNotFoundMessage(e instanceof ApiError ? friendsErrorMessage(e) : "This profile isn't available.");
+        setLoading(false);
+      });
+  }, [username, isOwn, authUser]);
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { load(); }, [load]);
 
   const handleSave = async () => {
     if (!profile) return;
@@ -159,6 +178,86 @@ export function ProfilePage({ userId }: { userId: string }) {
     }
   };
 
+  // ─── Relationship actions ───────────────────────────────────────────────────
+  // Decline/Cancel need a requestId that ProfileViewerContextDto doesn't carry, so they look it up
+  // just-in-time from the first page of pending requests (send-cap of 3/day/target makes >50
+  // simultaneous pending requests implausible).
+  async function findPendingRequestId(direction: 'incoming' | 'outgoing', targetUserId: string) {
+    const page = await friendsApi.getRequests(direction, { limit: 50 });
+    const match = page.items.find(r =>
+      direction === 'incoming' ? r.requesterId === targetUserId : r.addresseeId === targetUserId);
+    return match?.requestId ?? null;
+  }
+
+  const runAction = async (fn: () => Promise<void>) => {
+    setActionPending(true);
+    try {
+      await fn();
+      load();
+    } catch (e) {
+      toast.push({ kind: 'default', title: 'Error', body: friendsErrorMessage(e) });
+    } finally {
+      setActionPending(false);
+    }
+  };
+
+  const handleAddFriend = () => profile && runAction(async () => {
+    const result = await friendsApi.sendRequest(profile.userId);
+    if (result.outcome === 'cross_request_accepted') {
+      toast.push({ kind: 'success', title: 'Friend added', body: `You and ${profile.displayName} are now friends.` });
+    } else if (result.outcome === 'already_pending') {
+      toast.push({ kind: 'info', title: 'Request already sent' });
+    } else {
+      toast.push({ kind: 'success', title: 'Request sent' });
+    }
+  });
+
+  const handleAccept = () => profile && runAction(async () => {
+    // Documented shortcut: sending to someone with an existing reverse-pending request atomically accepts it.
+    await friendsApi.sendRequest(profile.userId);
+    toast.push({ kind: 'success', title: 'Friend request accepted' });
+  });
+
+  const handleDecline = () => profile && runAction(async () => {
+    const requestId = await findPendingRequestId('incoming', profile.userId);
+    if (!requestId) { toast.push({ kind: 'default', title: 'Request not found', body: 'It may have already been withdrawn.' }); return; }
+    await friendsApi.declineRequest(requestId);
+    toast.push({ kind: 'success', title: 'Request declined' });
+  });
+
+  const handleCancel = () => profile && runAction(async () => {
+    const requestId = await findPendingRequestId('outgoing', profile.userId);
+    if (!requestId) { toast.push({ kind: 'default', title: 'Request not found', body: 'It may have already been accepted or withdrawn.' }); return; }
+    await friendsApi.cancelRequest(requestId);
+    toast.push({ kind: 'success', title: 'Request cancelled' });
+  });
+
+  const handleRemove = () => profile && runAction(async () => {
+    await friendsApi.removeFriend(profile.userId);
+    setConfirmAction(null);
+    toast.push({ kind: 'success', title: 'Friend removed' });
+  });
+
+  const handleBlock = () => profile && runAction(async () => {
+    await friendsApi.blockUser(profile.userId);
+    setConfirmAction(null);
+    toast.push({ kind: 'success', title: 'User blocked' });
+  });
+
+  const handleUnblock = () => profile && runAction(async () => {
+    await friendsApi.unblockUser(profile.userId);
+    toast.push({ kind: 'success', title: 'User unblocked' });
+  });
+
+  const handleShare = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      toast.push({ kind: 'success', title: 'Link copied' });
+    } catch {
+      toast.push({ kind: 'default', title: 'Could not copy link' });
+    }
+  };
+
   if (loading) {
     return (
       <div className="page">
@@ -173,15 +272,16 @@ export function ProfilePage({ userId }: { userId: string }) {
     return (
       <div className="page">
         <div className="card-elev" style={{ padding: 40, textAlign: 'center', color: 'var(--text-lo)' }}>
-          Profile not found or private.
+          {notFoundMessage ?? "This profile isn't available."}
         </div>
       </div>
     );
   }
 
-  const avatarUser = { initials: profile.initials, color: localAvatarColor ?? profile.color, status: 'online' as const };
+  const avatarUser = { initials: profile.initials, color: localAvatarColor ?? profile.color };
   const joinedYear = new Date(profile.joinedAt).getFullYear();
   const regionText = profile.region?.trim().toLowerCase() === 'eu-west' ? '' : profile.region?.trim();
+  const relationshipState: RelationshipState | null = viewerContext?.relationshipState ?? (isOwn ? 'Self' : null);
 
   return (
     <div className="page">
@@ -262,7 +362,7 @@ export function ProfilePage({ userId }: { userId: string }) {
                     e.target.value = '';
                   }}
                 />
-                <Avatar user={avatarUser} src={profile.avatarUrl} size="xl" showPresence />
+                <Avatar user={avatarUser} src={profile.avatarUrl} size="xl" />
                 {isOwn && (
                   <button
                     aria-label="Avatar options"
@@ -326,9 +426,7 @@ export function ProfilePage({ userId }: { userId: string }) {
                 )}
               </div>
             </div>
-            <div className="row" style={{ gap: 8 }}>
-              <span className="chip chip--mono">{profile.elo} ELO</span>
-              <span className="chip chip--mono">Lv {profile.level}</span>
+            <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
               <span className="chip chip--mono">{profile.profileType}</span>
               <VisibilityBadge visibility={profile.visibility} />
             </div>
@@ -355,15 +453,58 @@ export function ProfilePage({ userId }: { userId: string }) {
               ))}
             </div>
           )}
+
+          {!isOwn && (
+            <div style={{ marginTop: 18 }}>
+              {relationshipState ? (
+                <RelationshipActions
+                  state={relationshipState}
+                  actionPending={actionPending}
+                  onAdd={handleAddFriend}
+                  onAccept={handleAccept}
+                  onDecline={handleDecline}
+                  onCancel={handleCancel}
+                  onRemove={() => setConfirmAction('remove')}
+                  onBlock={() => setConfirmAction('block')}
+                  onUnblock={handleUnblock}
+                  onShare={() => void handleShare()}
+                />
+              ) : (
+                <div className="row" style={{ gap: 8 }}>
+                  <span style={{ fontSize: 13, color: 'var(--text-lo)' }}>Sign in to add friends or send messages.</span>
+                  <Button variant="ghost" size="sm" icon="share" onClick={() => void handleShare()}>Share</Button>
+                </div>
+              )}
+              {viewerContext && viewerContext.visibleMutualFriendCount > 0 && (
+                <Link
+                  href={ROUTES.uMutualFriends(username)}
+                  className="mono"
+                  style={{ fontSize: 11.5, color: 'var(--text-lo)', marginTop: 8, display: 'block', width: 'fit-content' }}
+                >
+                  {viewerContext.visibleMutualFriendCount} mutual friend{viewerContext.visibleMutualFriendCount !== 1 ? 's' : ''}
+                </Link>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Stats — placeholders until Module 10 */}
+      {/* Stats — matches/win-rate/streak are placeholders until Module 10; Friends is real and drills down. */}
       <div className="grid grid-4" style={{ marginTop: 18 }}>
         <StatCard label="Matches"     value="—"  hint="Module 10"   icon="controller" />
         <StatCard label="Win rate"    value="—"  hint="Module 10"   icon="trophy" />
         <StatCard label="Best streak" value="—"  hint="Module 10"   icon="flame" />
-        <StatCard label="Friends"     value="—"  hint="Module 3"    icon="users" accent="ice" />
+        {viewerContext ? (
+          viewerContext.canViewFriends ? (
+            <Link href={ROUTES.uFriends(username)} style={{ textDecoration: 'none', color: 'inherit' }}>
+              <StatCard label="Friends" value={String(viewerContext.visibleFriendCount ?? profile.friendCount)} hint="View all" icon="users" accent="ice" />
+            </Link>
+          ) : (
+            <StatCard label="Friends" value="Private" icon="users" accent="ice" />
+          )
+        ) : (
+          <StatCard label="Friends" value={String(profile.friendCount)} icon="users" accent="ice" />
+        )}
       </div>
 
       <div style={{ marginTop: 24 }}>
@@ -380,162 +521,155 @@ export function ProfilePage({ userId }: { userId: string }) {
       </div>
 
       <div style={{ marginTop: 16 }}>
-        {tab === 'overview' && <ProfileOverview />}
-        {tab === 'matches'  && <MatchHistoryTable />}
-        {tab === 'achieve'  && <AchievementsGrid />}
-        {tab === 'games'    && <FavoriteGames />}
+        {tab === 'overview' && (
+          <EmptyState
+            icon="layers"
+            title="Performance overview is coming later"
+            body="Match history and achievements ship with Module 10 (Ranking & Matches); favorite games ship with Module 4 (Game Library)."
+          />
+        )}
+        {tab === 'matches' && (
+          <EmptyState icon="controller" title="Match history" body="Available once Module 10 (Ranking & Matches) ships." />
+        )}
+        {tab === 'achieve' && (
+          <EmptyState icon="trophy" title="Achievements" body="Available once Module 10 (Ranking & Matches) ships." />
+        )}
+        {tab === 'games' && (
+          <EmptyState icon="library" title="Favorite games" body="Available once Module 4 (Game Library) ships." />
+        )}
       </div>
+
+      <Modal
+        open={confirmAction !== null}
+        onClose={() => setConfirmAction(null)}
+        title={confirmAction === 'block' ? 'Block this user?' : 'Remove friend?'}
+        icon={confirmAction === 'block' ? 'shield' : 'x'}
+        footer={
+          <div className="row" style={{ gap: 8, justifyContent: 'flex-end' }}>
+            <Button variant="ghost" onClick={() => setConfirmAction(null)} disabled={actionPending}>Cancel</Button>
+            <Button
+              onClick={() => (confirmAction === 'block' ? handleBlock() : handleRemove())}
+              disabled={actionPending}
+            >
+              {actionPending ? 'Working…' : confirmAction === 'block' ? 'Block' : 'Remove'}
+            </Button>
+          </div>
+        }
+      >
+        <p style={{ margin: 0, fontSize: 13.5, color: 'var(--text-md)' }}>
+          {confirmAction === 'block'
+            ? `${profile.displayName} won't be able to send you friend requests, and any existing friendship will be removed.`
+            : `${profile.displayName} will be removed from your friends list.`}
+        </p>
+      </Modal>
     </div>
   );
 }
 
-function ProfileOverview() {
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 18 }}>
-      <PerformanceChart />
-      <div className="col" style={{ gap: 18 }}>
-        <FavoriteGames compact />
-        <AchievementsGrid compact />
-      </div>
-    </div>
-  );
+interface RelationshipActionsProps {
+  state: RelationshipState;
+  actionPending: boolean;
+  onAdd: () => void;
+  onAccept: () => void;
+  onDecline: () => void;
+  onCancel: () => void;
+  onRemove: () => void;
+  onBlock: () => void;
+  onUnblock: () => void;
+  onShare: () => void;
 }
 
-function PerformanceChart() {
-  const data = [1640, 1680, 1655, 1700, 1690, 1720, 1755, 1740, 1780, 1810, 1795, 1825, 1842];
-  const min = Math.min(...data), max = Math.max(...data);
-  const W = 600, H = 200, pad = 24;
-  const pts = data.map((v, i) => {
-    const x = pad + (i / (data.length - 1)) * (W - pad * 2);
-    const y = H - pad - ((v - min) / (max - min)) * (H - pad * 2);
-    return [x, y];
-  });
-  const d = pts.map((p, i) => (i === 0 ? 'M' : 'L') + p[0] + ' ' + p[1]).join(' ');
-  const dArea = d + ` L ${W - pad} ${H - pad} L ${pad} ${H - pad} Z`;
-
-  return (
-    <div className="card" style={{ padding: 20 }}>
-      <div className="row between">
-        <div>
-          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}>ELO over time</div>
-          <div className="page-sub">Last 13 days</div>
+function RelationshipActions({
+  state, actionPending, onAdd, onAccept, onDecline, onCancel, onRemove, onBlock, onUnblock, onShare,
+}: RelationshipActionsProps) {
+  switch (state) {
+    case 'None':
+      return (
+        <div className="row" style={{ gap: 8 }}>
+          <Button icon="plus" disabled={actionPending} onClick={onAdd}>Add friend</Button>
+          <Button variant="ghost" icon="share" onClick={onShare}>Share</Button>
+          <MoreMenu onBlock={onBlock} />
         </div>
-        <Tabs value="13d" onChange={() => {}} items={[{ value: '7d', label: '7d' }, { value: '13d', label: '13d' }, { value: '30d', label: '30d' }]} />
-      </div>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 220, marginTop: 14 }}>
-        <defs>
-          <linearGradient id="elo-grad" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="#F0394B" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="#F0394B" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        {Array.from({ length: 4 }).map((_, i) => (
-          <line key={i} x1={pad} x2={W - pad} y1={pad + i * ((H - pad * 2) / 3)} y2={pad + i * ((H - pad * 2) / 3)} stroke="#1B2238" />
-        ))}
-        <path d={dArea} fill="url(#elo-grad)" />
-        <path d={d} fill="none" stroke="#F0394B" strokeWidth="2" />
-        {pts.map((p, i) => (
-          <circle key={i} cx={p[0]} cy={p[1]} r={i === pts.length - 1 ? 5 : 2.5} fill="#F0394B" stroke="#0F1422" strokeWidth={i === pts.length - 1 ? 3 : 1} />
-        ))}
-        <text x={W - pad} y={(pts[pts.length - 1][1] ?? 0) - 10} textAnchor="end" fill="#F0394B" fontFamily="JetBrains Mono" fontWeight="600" fontSize="12">1842</text>
-      </svg>
-    </div>
-  );
+      );
+    case 'IncomingPending':
+      return (
+        <div className="row" style={{ gap: 8 }}>
+          <Button icon="check" disabled={actionPending} onClick={onAccept}>
+            {actionPending ? 'Working…' : 'Accept'}
+          </Button>
+          <Button variant="ghost" icon="x" disabled={actionPending} onClick={onDecline}>Decline</Button>
+          <Button variant="ghost" icon="share" onClick={onShare}>Share</Button>
+        </div>
+      );
+    case 'OutgoingPending':
+      return (
+        <div className="row" style={{ gap: 8 }}>
+          <Button variant="ghost" disabled aria-disabled="true">Request pending</Button>
+          <Button variant="ghost" icon="x" disabled={actionPending} onClick={onCancel}>Cancel</Button>
+          <Button variant="ghost" icon="share" onClick={onShare}>Share</Button>
+        </div>
+      );
+    case 'Friends':
+      return (
+        <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+          <Button variant="ghost" icon="plus" disabled aria-disabled="true">Invite (Module 6)</Button>
+          <Button variant="ghost" icon="x" disabled={actionPending} onClick={onRemove}>Remove friend</Button>
+          <Button variant="ghost" icon="share" onClick={onShare}>Share</Button>
+          <MoreMenu onBlock={onBlock} />
+        </div>
+      );
+    case 'BlockedBySelf':
+      return (
+        <div className="row" style={{ gap: 8 }}>
+          <Button variant="ghost" icon="shield" disabled={actionPending} onClick={onUnblock}>
+            {actionPending ? 'Working…' : 'Unblock'}
+          </Button>
+          <Button variant="ghost" icon="share" onClick={onShare}>Share</Button>
+        </div>
+      );
+    case 'Self':
+    default:
+      return null;
+  }
 }
 
-function MatchHistoryTable() {
-  const matches = [...RECENT_MATCHES, ...RECENT_MATCHES.map((m, i) => ({ ...m, id: m.id + 'x' + i, when: '4d ago' }))];
-  return (
-    <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-      <div className="row" style={{ padding: '12px 18px', borderBottom: '1px solid var(--border-1)' }}>
-        <div className="uppercase-label" style={{ width: 120 }}>Result</div>
-        <div className="uppercase-label" style={{ flex: 1 }}>Game / Opponent</div>
-        <div className="uppercase-label" style={{ width: 120 }}>Duration</div>
-        <div className="uppercase-label" style={{ width: 80, textAlign: 'right' }}>ELO</div>
-        <div className="uppercase-label" style={{ width: 100, textAlign: 'right' }}>When</div>
-      </div>
-      {matches.map(m => {
-        const c = m.result === 'win' ? 'var(--success)' : m.result === 'loss' ? 'var(--danger)' : 'var(--text-lo)';
-        return (
-          <div key={m.id} className="row" style={{ padding: '12px 18px', borderBottom: '1px solid var(--border-1)' }}>
-            <div className="row" style={{ width: 120, gap: 8 }}>
-              <div style={{ width: 6, height: 18, background: c, borderRadius: 3 }} />
-              <span style={{ textTransform: 'uppercase', fontSize: 11, color: c, fontWeight: 600, letterSpacing: '0.06em', fontFamily: 'var(--font-mono)' }}>{m.result}</span>
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 600, fontSize: 13 }}>{m.game}</div>
-              <div className="mono" style={{ fontSize: 11, color: 'var(--text-lo)' }}>vs {m.opponent}</div>
-            </div>
-            <div className="mono" style={{ width: 120, fontSize: 12.5 }}>{m.duration}</div>
-            <div className="mono" style={{ width: 80, fontSize: 12.5, textAlign: 'right', color: m.delta.startsWith('+') ? 'var(--success)' : m.delta.startsWith('-') ? 'var(--danger)' : 'var(--text-lo)', fontWeight: 600 }}>{m.delta}</div>
-            <div className="mono" style={{ width: 100, fontSize: 11, textAlign: 'right', color: 'var(--text-lo)' }}>{m.when}</div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
+function MoreMenu({ onBlock }: { onBlock: () => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
 
-function AchievementsGrid({ compact }: { compact?: boolean }) {
-  const list = compact ? ACHIEVEMENTS.slice(0, 4) : ACHIEVEMENTS;
-  return (
-    <div className="card" style={{ padding: 18 }}>
-      <div className="row between">
-        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 14 }}>Achievements</div>
-        <span className="chip chip--mono">3 / 6 unlocked</span>
-      </div>
-      <div className="grid grid-2" style={{ marginTop: 14 }}>
-        {list.map(a => (
-          <div key={a.id} className="surface" style={{ padding: 14, opacity: a.unlocked ? 1 : 0.7 }}>
-            <div className="row" style={{ gap: 10 }}>
-              <div style={{
-                width: 36, height: 36, borderRadius: 10,
-                background: a.unlocked ? rarityBg(a.rarity) : 'var(--bg-3)',
-                color: a.unlocked ? rarityFg(a.rarity) : 'var(--text-dim)',
-                display: 'grid', placeItems: 'center', border: '1px solid var(--border-2)',
-              }}>
-                <Icon name={a.unlocked ? 'trophy' : 'lock'} size={16} />
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="row between">
-                  <span style={{ fontWeight: 600, fontSize: 13 }}>{a.name}</span>
-                  <span className="chip chip--mono" style={{ height: 18, padding: '0 6px', fontSize: 10, textTransform: 'capitalize' }}>{a.rarity}</span>
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--text-lo)', marginTop: 2 }}>{a.desc}</div>
-                {!a.unlocked && a.progress != null && (
-                  <div style={{ marginTop: 8 }}>
-                    <div className="bar bar--ice" style={{ height: 4 }}><div className="bar__fill" style={{ width: (a.progress * 100) + '%' }} /></div>
-                    <div className="mono" style={{ fontSize: 10.5, color: 'var(--text-lo)', marginTop: 4 }}>{Math.round(a.progress * 100)}%</div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    if (open) document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [open]);
 
-function FavoriteGames({ compact }: { compact?: boolean }) {
-  const games = GAMES.slice(0, compact ? 4 : 8);
   return (
-    <div className="card" style={{ padding: 18 }}>
-      <div className="row between">
-        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 14 }}>Favorite games</div>
-        <span className="chip chip--mono">8 played</span>
-      </div>
-      <div className="grid grid-2" style={{ marginTop: 12 }}>
-        {games.map(g => (
-          <div key={g.id} className="surface" style={{ padding: 10 }}>
-            <GameArt game={g} h={90} />
-            <div className="row between" style={{ marginTop: 8 }}>
-              <span style={{ fontSize: 12.5, fontWeight: 600 }}>{g.name}</span>
-              <span className="mono" style={{ fontSize: 11, color: 'var(--text-lo)' }}>{g.online} online</span>
-            </div>
-          </div>
-        ))}
-      </div>
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button className="btn btn-ghost btn-icon btn-sm" aria-label="More actions" onClick={() => setOpen(v => !v)}>
+        <Icon name="more" size={14} />
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', right: 0, top: '100%', zIndex: 10,
+          background: 'var(--bg-3)', border: '1px solid var(--border-2)',
+          borderRadius: 8, padding: '4px 0', minWidth: 180,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+        }}>
+          <button
+            className="btn btn-ghost"
+            style={{ width: '100%', textAlign: 'left', padding: '8px 14px', fontSize: 13, borderRadius: 0, color: 'var(--danger)' }}
+            onClick={() => { setOpen(false); onBlock(); }}
+          >Block user</button>
+          <button
+            className="btn btn-ghost"
+            style={{ width: '100%', textAlign: 'left', padding: '8px 14px', fontSize: 13, borderRadius: 0 }}
+            disabled
+            aria-disabled="true"
+          >Report (Module 12)</button>
+        </div>
+      )}
     </div>
   );
 }

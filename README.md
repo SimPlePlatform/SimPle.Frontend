@@ -43,7 +43,7 @@ The backend API must be running at `NEXT_PUBLIC_API_URL` (default `http://localh
 npm test
 ```
 
-47 tests across 5 files.
+177 tests across 17 files.
 
 ## CI
 

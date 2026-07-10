@@ -4,16 +4,10 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Icon } from '@/components/ui/Icons';
 import { Avatar } from '@/components/ui/Avatar';
-import { FRIEND_REQUESTS } from '@/mock/friends';
 import { ROUTES } from '@/lib/routes';
 import { useAuth } from '@/features/auth/AuthProvider';
+import { useFriendSummary } from '@/features/friends/FriendSummaryContext';
 
-const NAV_PRIMARY = [
-  { href: ROUTES.dashboard, label: 'Dashboard', icon: 'home' },
-  { href: ROUTES.games, label: 'Game Library', icon: 'library' },
-  { href: ROUTES.friends, label: 'Friends', icon: 'users', badgeCount: FRIEND_REQUESTS.length },
-  { href: ROUTES.leaderboards, label: 'Leaderboards', icon: 'trophy' },
-];
 const NAV_SESSION = [
   { href: ROUTES.lobby('SP-7F-29'), label: 'Active Lobby', icon: 'controller' },
   { href: ROUTES.profile('me'), label: 'My Profile', icon: 'user' },
@@ -25,6 +19,16 @@ const NAV_META = [
 export function Sidebar() {
   const pathname = usePathname();
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
+
+  const { summary, loading, error } = useFriendSummary();
+  const friendBadge = (!loading && !error && summary) ? summary.incomingRequestCount : 0;
+
+  const NAV_PRIMARY = [
+    { href: ROUTES.dashboard, label: 'Dashboard', icon: 'home' },
+    { href: ROUTES.games, label: 'Game Library', icon: 'library' },
+    { href: ROUTES.friends, label: 'Friends', icon: 'users', badgeCount: friendBadge },
+    { href: ROUTES.leaderboards, label: 'Leaderboards', icon: 'trophy' },
+  ];
 
   return (
     <aside className="sidebar">

@@ -9,6 +9,7 @@ import { NOTIFICATIONS } from '@/mock/notifications';
 import { ROUTES } from '@/lib/routes';
 import { CreateLobbyModal } from '@/components/lobby/CreateLobbyModal';
 import { InviteFriendModal } from '@/components/friends/InviteFriendModal';
+import { PeopleSearchCombobox } from '@/components/search/PeopleSearchCombobox';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { useTheme } from '@/lib/theme';
 
@@ -16,6 +17,7 @@ export function Topbar({ onHamburger }: { onHamburger?: () => void }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [lobbyOpen, setLobbyOpen]  = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 
   return (
     <header className="topbar">
@@ -28,19 +30,22 @@ export function Topbar({ onHamburger }: { onHamburger?: () => void }) {
       >
         <Icon name="menu" size={18} />
       </button>
-      {/* Search — hidden on small screens via .topbar__search class */}
+      {/* Search — hidden on small screens via .topbar__search class; mobile uses the icon + panel below instead */}
       <div className="topbar__search row" style={{ flex:1, gap:8, maxWidth:480 }}>
-        <div style={{ position:'relative', flex:1 }}>
-          <Icon name="search" size={15} style={{ position:'absolute', left:11, top:11, color:'var(--text-lo)' }} />
-          <input className="input" placeholder="Search games, friends, lobbies…" style={{ paddingLeft:34 }} />
-          <span className="chip chip--mono" style={{ position:'absolute', right:8, top:7, height:24, fontSize:10 }}>⌘ K</span>
-        </div>
+        <PeopleSearchCombobox />
       </div>
-      {/* Mobile-only search icon (shown when topbar__search is hidden) */}
-      <button className="btn btn-ghost btn-icon btn-sm" aria-label="Search"
-        style={{ display:'none' }} id="topbar-search-icon">
-        <Icon name="search" size={16} />
+      {/* Mobile-only search entry point — a real equivalent control, not a dead/hidden action */}
+      <button className="btn btn-ghost btn-icon btn-sm" aria-label={mobileSearchOpen ? 'Close search' : 'Search'}
+        aria-expanded={mobileSearchOpen} aria-controls="topbar-mobile-search-panel"
+        style={{ display:'none' }} id="topbar-search-icon"
+        onClick={() => setMobileSearchOpen(v => !v)}>
+        <Icon name={mobileSearchOpen ? 'x' : 'search'} size={16} />
       </button>
+      {mobileSearchOpen && (
+        <div id="topbar-mobile-search-panel" className="topbar__mobile-search-panel">
+          <PeopleSearchCombobox autoFocus onNavigate={() => setMobileSearchOpen(false)} />
+        </div>
+      )}
       <div className="row" style={{ gap:6 }}>
         {/* Text CTAs hidden on small screens via .topbar__actions-text */}
         <span className="topbar__actions-text row" style={{ gap:6 }}>
@@ -173,7 +178,7 @@ function UserMenuButton() {
       </button>
       {open && (
         <div className="card-elev" style={{ position:'absolute', right:0, top:'calc(100% + 8px)', width:190, zIndex:40, padding:8 }}>
-          <button className="btn btn-ghost btn-sm" style={{ width:'100%', justifyContent:'flex-start' }} onClick={() => router.push(ROUTES.profile('me'))}>
+          <button className="btn btn-ghost btn-sm" style={{ width:'100%', justifyContent:'flex-start' }} onClick={() => router.push(ROUTES.u(user.username))}>
             <Icon name="user" size={14} /> My Profile
           </button>
           <button className="btn btn-ghost btn-sm" style={{ width:'100%', justifyContent:'flex-start', marginTop:4 }} onClick={() => router.push(ROUTES.settings)}>
