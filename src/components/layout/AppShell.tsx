@@ -15,9 +15,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="app__sidebar">
           <Sidebar />
         </div>
-        <header className="app__topbar">
+        <div className="app__topbar">
           <Topbar onHamburger={() => setDrawerOpen(true)} />
-        </header>
+        </div>
         <main className="app__main">
           {children}
         </main>

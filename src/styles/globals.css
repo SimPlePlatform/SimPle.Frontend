@@ -17,7 +17,7 @@
 
   --text-hi: #F2F5FB;
   --text-md: #B6BFD5;
-  --text-lo: #7A8299;
+  --text-lo: #7C849D;
   --text-dim: #525972;
 
   --red-50: #FFE5E8;
@@ -494,7 +494,13 @@ button { font: inherit; cursor: pointer; border: none; background: none; }
   :root { --sidebar-w: 72px; }
   .sidebar { padding: 14px 10px; align-items: center; }
   .sidebar .brand__name, .sidebar .brand__tag,
-  .nav-item span:not(.nav-item__badge), .nav-group__label { display: none; }
+  .nav-group__label { display: none; }
+  /* Rail mode hides the label visually, but the link still needs an accessible name —
+     clip instead of display:none so screen readers still read it. */
+  .nav-item span:not(.nav-item__badge) {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
   .nav-item { justify-content: center; padding: 10px; }
   .nav-item--active::before { left: -10px; }
   .sidebar .user-card__name, .sidebar .user-card__role { display: none; }

@@ -8,6 +8,9 @@ export const test = base.extend({});
 // This is a focused regression check, not a replacement for the Module 14 manual/screen-reader review.
 test.afterEach(async ({ page }, testInfo) => {
   if (testInfo.status !== 'passed') return;
+  // API-only tests (using the `request` fixture) never navigate `page`, leaving it at about:blank —
+  // scanning that would always fail on a document that was never meant to render anything.
+  if (page.url() === 'about:blank') return;
 
   const results = await new AxeBuilder({ page }).analyze();
   const summary = results.violations
