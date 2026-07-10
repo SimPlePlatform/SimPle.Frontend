@@ -261,7 +261,7 @@ function DashboardPreview() {
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
               {[GAMES[3], GAMES[1]].map(g => (
                 <div key={g.id} className="surface" style={{ padding:10 }}>
-                  <GameArt game={g} h={100} />
+                  <GameArt game={{ artToken: g.art.kind, artColorA: g.art.a, artColorB: g.art.b, artAltText: g.name, name: g.name }} h={100} />
                   <div className="row between" style={{ marginTop:8 }}>
                     <div className="mono" style={{ fontSize:11, color:'var(--text-lo)' }}>{g.duration}</div>
                     <Button size="sm" variant="ghost" icon="play">Play</Button>

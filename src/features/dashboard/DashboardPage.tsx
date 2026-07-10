@@ -1,5 +1,6 @@
 'use client';
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ApiError } from '@/lib/api-client';
 import { Button } from '@/components/ui/Button';
@@ -11,13 +12,14 @@ import { CreateLobbyModal } from '@/components/lobby/CreateLobbyModal';
 import { InviteFriendModal } from '@/components/friends/InviteFriendModal';
 import { PlayerIdentity } from '@/components/identity/PlayerIdentity';
 import { CURRENT_USER } from '@/mock/users';
-import { GAMES } from '@/mock/games';
 import { RECENT_MATCHES } from '@/mock/matches';
 import { NOTIFICATIONS } from '@/mock/notifications';
 import { ROUTES } from '@/lib/routes';
 import { friendsApi } from '@/features/friends/friendsApi';
 import { useFriendSummary } from '@/features/friends/FriendSummaryContext';
 import type { FriendDto } from '@/features/friends/types';
+import { gamesApi } from '@/features/games/gamesApi';
+import type { GameCatalogDto } from '@/features/games/types';
 
 export function DashboardPage() {
   const u = CURRENT_USER;
@@ -37,6 +39,16 @@ export function DashboardPage() {
       .then(r => { if (!cancelled) setFriends(r.items); })
       .catch(e => { if (!cancelled) setFriendsError(e instanceof ApiError ? e.message : 'Failed to load friends.'); })
       .finally(() => { if (!cancelled) setFriendsLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const [featured, setFeatured] = useState<GameCatalogDto | undefined>(undefined);
+
+  useEffect(() => {
+    let cancelled = false;
+    gamesApi.getFeatured()
+      .then(g => { if (!cancelled) setFeatured(g); })
+      .catch(() => { if (!cancelled) setFeatured(undefined); });
     return () => { cancelled = true; };
   }, []);
 
@@ -80,54 +92,24 @@ export function DashboardPage() {
         <StatCard label="Streak"   value="4W"    trend="+4"  hint="best of season" icon="flame" />
       </div>
 
-      {/* Continue playing */}
-      <section className="section">
-        <div className="section-head">
-          <div>
-            <div className="section-title">Continue playing</div>
-            <div className="page-sub">Pick up an unfinished match or jump into a quick one.</div>
-          </div>
-          <Button variant="ghost" size="sm" iconRight="chevronRight" onClick={() => router.push(ROUTES.games)}>Game library</Button>
-        </div>
-        <div className="grid grid-4">
-          {[3,0,7,5].map(i => {
-            const g = GAMES[i];
-            return (
-              <div key={g.id} className="card" style={{ overflow:'hidden', cursor:'pointer' }} onClick={() => router.push(ROUTES.game(g.id))}>
-                <GameArt game={g} h={120} />
-                <div style={{ padding:14 }}>
-                  <div className="row between">
-                    <div className="row" style={{ gap:8 }}>
-                      <span className="chip chip--mono">{g.duration}</span>
-                      <span className="chip chip--mono">{g.difficulty}</span>
-                    </div>
-                    <Button size="sm" variant="ghost" icon="play" />
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
       {/* Friends + Matches */}
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:18, marginTop:28 }}>
         <FriendsPanel friends={friends} loading={friendsLoading} error={friendsError} summary={summary} />
         <RecentMatchesPanel />
       </div>
 
-      {/* Recommended */}
-      <section className="section">
-        <div className="section-head">
-          <div className="section-title">Recommended for you</div>
-          <div className="row" style={{ gap:6 }}>
-            <span className="chip chip--mono">Based on your last 50 matches</span>
+      {/* Featured */}
+      {featured && (
+        <section className="section">
+          <div className="section-head">
+            <div className="section-title">Featured</div>
+            <Button variant="ghost" size="sm" iconRight="chevronRight" onClick={() => router.push(ROUTES.games)}>Game library</Button>
           </div>
-        </div>
-        <div className="grid grid-3">
-          {[1,2,6].map(i => <GameCardBig key={GAMES[i].id} game={GAMES[i]} />)}
-        </div>
-      </section>
+          <div className="grid grid-3">
+            <GameCardBig game={featured} />
+          </div>
+        </section>
+      )}
 
       <CreateLobbyModal open={lobbyOpen} onClose={() => setLobbyOpen(false)} />
       <InviteFriendModal open={inviteOpen} onClose={() => setInviteOpen(false)} />
@@ -143,8 +125,7 @@ function HeroPanel() {
     <div className="card-elev" style={{ padding:20, position:'relative', overflow:'hidden' }}>
       <div style={{ position:'absolute', inset:0, background:'radial-gradient(600px 280px at 100% -20%, rgba(240,57,75,0.18), transparent 60%)' }} />
       <div style={{ position:'relative' }}>
-        <div className="row between">
-          <span className="chip chip--red chip--mono"><span className="dot dot--playing" /> Season 4 · ranked open</span>
+        <div className="row">
           <span className="chip chip--mono">Region: {u.region}</span>
         </div>
         <div className="row" style={{ marginTop:22, gap:18 }}>
@@ -345,23 +326,27 @@ function RecentMatchesPanel() {
   );
 }
 
-function GameCardBig({ game }: { game: typeof GAMES[0] }) {
-  const router = useRouter();
+function GameCardBig({ game }: { game: GameCatalogDto }) {
+  const duration = game.estimatedDurationMinMinutes === game.estimatedDurationMaxMinutes
+    ? `${game.estimatedDurationMinMinutes} min`
+    : `${game.estimatedDurationMinMinutes}–${game.estimatedDurationMaxMinutes} min`;
+  const chips = [game.category, ...game.tags.filter(t => t !== game.category)].slice(0, 2);
   return (
-    <div className="card" style={{ overflow:'hidden', cursor:'pointer' }} onClick={() => router.push(ROUTES.game(game.id))}>
-      <GameArt game={game} h={140} />
-      <div style={{ padding:16 }}>
-        <div className="row between">
-          <div>
-            <div style={{ fontFamily:'var(--font-display)', fontWeight:600 }}>{game.name}</div>
-            <div className="mono" style={{ fontSize:11, color:'var(--text-lo)', marginTop:2 }}>{game.duration} · {game.difficulty}</div>
+    <Link href={ROUTES.game(game.slug)} style={{ textDecoration:'none', color:'inherit' }}>
+      <div className="card" style={{ overflow:'hidden' }}>
+        <GameArt game={game} h={140} />
+        <div style={{ padding:16 }}>
+          <div className="row between">
+            <div>
+              <div style={{ fontFamily:'var(--font-display)', fontWeight:600 }}>{game.name}</div>
+              <div className="mono" style={{ fontSize:11, color:'var(--text-lo)', marginTop:2 }}>{duration} · {game.difficulty}</div>
+            </div>
           </div>
-          <Button size="sm" icon="play">Play</Button>
-        </div>
-        <div className="row" style={{ gap:6, marginTop:12, flexWrap:'wrap' }}>
-          {game.cats.slice(0,2).map(c => <span key={c} className="chip">{c}</span>)}
+          <div className="row" style={{ gap:6, marginTop:12, flexWrap:'wrap' }}>
+            {chips.map(c => <span key={c} className="chip">{c}</span>)}
+          </div>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
