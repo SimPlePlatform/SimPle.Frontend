@@ -12,7 +12,7 @@ import { useAuth } from '@/features/auth/AuthProvider';
 import { profileApi, type UserProfile, type UsernameChangeRequest } from '@/features/profile/profileApi';
 import { friendsApi } from '@/features/friends/friendsApi';
 import { friendsErrorMessage } from '@/features/friends/friendsErrors';
-import type { BlockDto } from '@/features/friends/types';
+import type { BlockDto, SearchVisibility, FriendsListVisibility } from '@/features/friends/types';
 
 const LINK_PLATFORMS = [
   { value: 'github',    label: 'GitHub' },
@@ -927,6 +927,8 @@ function PrivacySettings() {
 
   // Friend request privacy
   const [privacy, setPrivacy]           = useState<'Anyone' | 'FriendsOfFriends' | 'Off' | null>(null);
+  const [searchVisibility, setSearchVisibility] = useState<SearchVisibility | null>(null);
+  const [listVisibility, setListVisibility]     = useState<FriendsListVisibility | null>(null);
   const [privacyLoading, setPrivacyLoading] = useState(true);
   const [privacySaving, setPrivacySaving]   = useState(false);
   const [privacyError, setPrivacyError]     = useState<string | null>(null);
@@ -957,7 +959,12 @@ function PrivacySettings() {
      
     setPrivacyError(null);
     friendsApi.getSettings()
-      .then(s => { if (!cancelled) setPrivacy(s.friendRequestPrivacy); })
+      .then(s => {
+        if (cancelled) return;
+        setPrivacy(s.friendRequestPrivacy);
+        setSearchVisibility(s.searchVisibility);
+        setListVisibility(s.friendsListVisibility);
+      })
       .catch(e => { if (!cancelled) setPrivacyError(e instanceof ApiError ? e.message : 'Could not load privacy settings.'); })
       .finally(() => { if (!cancelled) setPrivacyLoading(false); });
     return () => { cancelled = true; };
@@ -1000,6 +1007,34 @@ function PrivacySettings() {
       toast.push({ kind: 'success', title: 'Privacy updated.' });
     } catch (e) {
       toast.push({ kind: 'default', title: e instanceof ApiError ? e.message : 'Could not update privacy.' });
+    } finally {
+      setPrivacySaving(false);
+    }
+  };
+
+  const handleSearchVisibilityChange = async (v: SearchVisibility) => {
+    if (privacySaving || privacyLoading || !privacy) return;
+    setPrivacySaving(true);
+    try {
+      const s = await friendsApi.updateSettings(privacy, v);
+      setSearchVisibility(s.searchVisibility);
+      toast.push({ kind: 'success', title: 'Search visibility updated.' });
+    } catch (e) {
+      toast.push({ kind: 'default', title: e instanceof ApiError ? e.message : 'Could not update search visibility.' });
+    } finally {
+      setPrivacySaving(false);
+    }
+  };
+
+  const handleListVisibilityChange = async (v: FriendsListVisibility) => {
+    if (privacySaving || privacyLoading || !privacy) return;
+    setPrivacySaving(true);
+    try {
+      const s = await friendsApi.updateSettings(privacy, undefined, v);
+      setListVisibility(s.friendsListVisibility);
+      toast.push({ kind: 'success', title: 'Friends list visibility updated.' });
+    } catch (e) {
+      toast.push({ kind: 'default', title: e instanceof ApiError ? e.message : 'Could not update friends list visibility.' });
     } finally {
       setPrivacySaving(false);
     }
@@ -1067,6 +1102,36 @@ function PrivacySettings() {
           })}
         </div>
       } />
+      <SettingRow label="Who can find you in search" right={
+        <div className="tabs">
+          {(['Everyone', 'FriendsOfFriends', 'Nobody'] as const).map(v => (
+            <button
+              key={v}
+              className={`tab ${searchVisibility === v ? 'tab--active' : ''}`}
+              disabled={privacyLoading || privacySaving}
+              onClick={() => void handleSearchVisibilityChange(v)}
+            >{v === 'FriendsOfFriends' ? 'Friends-of-friends' : v}</button>
+          ))}
+        </div>
+      } />
+
+      <SettingRow label="Who can see your friends list" right={
+        <div className="tabs">
+          {([
+            { value: 'Everyone', label: 'Everyone' },
+            { value: 'Friends', label: 'Friends' },
+            { value: 'OnlyMe', label: 'Only me' },
+          ] as const).map(o => (
+            <button
+              key={o.value}
+              className={`tab ${listVisibility === o.value ? 'tab--active' : ''}`}
+              disabled={privacyLoading || privacySaving}
+              onClick={() => void handleListVisibilityChange(o.value)}
+            >{o.label}</button>
+          ))}
+        </div>
+      } />
+
       {privacyError && (
         <div style={{ fontSize: 12, color: 'var(--danger)', padding: '0 0 8px' }}>
           {privacyError}{' '}
