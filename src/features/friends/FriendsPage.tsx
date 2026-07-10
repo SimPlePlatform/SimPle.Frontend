@@ -12,6 +12,7 @@ import { useFriendSummary } from './FriendSummaryContext';
 import { friendsApi } from './friendsApi';
 import { friendsErrorMessage } from './friendsErrors';
 import { AddFriendModal } from './AddFriendModal';
+import { PlayerIdentity } from '@/components/identity/PlayerIdentity';
 import type { FriendDto, FriendRequestDto, FriendSuggestionDto } from './types';
 
 export function FriendsPage() {
@@ -510,11 +511,7 @@ function FriendList({ friends, loading, loadingMore, error, hasNext, pendingActi
       </div>
       {friends.map(f => (
         <div key={f.userId} className="friend-row" style={{ position: 'relative' }}>
-          <Avatar src={f.avatarUrl} user={{ initials: f.initials, color: f.color }} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13.5, fontWeight: 600 }}>{f.displayName}</div>
-            <div className="mono" style={{ fontSize: 11, color: 'var(--text-lo)' }}>@{f.username}</div>
-          </div>
+          <PlayerIdentity player={f} />
           <div className="friend-row__status" />
           {/* ELO value hidden until M10 */}
           <div className="friend-row__actions">
@@ -603,13 +600,16 @@ function RequestsPanel({
           <div className="col" style={{ gap: 8 }}>
             {incoming.map(r => (
               <div key={r.requestId} className="surface row" style={{ padding: 14, gap: 12 }}>
-                <Avatar src={r.requesterAvatarUrl} user={{ initials: r.requesterInitials, color: r.requesterColor }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 600 }}>{r.requesterDisplayName}</div>
-                  <div className="mono" style={{ fontSize: 11, color: 'var(--text-lo)' }}>
-                    {r.mutualFriendCount} mutual friend{r.mutualFriendCount !== 1 ? 's' : ''}
-                  </div>
-                </div>
+                <PlayerIdentity
+                  player={{
+                    username: r.requesterUsername,
+                    displayName: r.requesterDisplayName,
+                    initials: r.requesterInitials,
+                    color: r.requesterColor,
+                    avatarUrl: r.requesterAvatarUrl,
+                  }}
+                  subtitle={`${r.mutualFriendCount} mutual friend${r.mutualFriendCount !== 1 ? 's' : ''}`}
+                />
                 <Button
                   size="sm" icon="check"
                   disabled={isP(`accept-${r.requestId}`) || isP(`decline-${r.requestId}`)}
@@ -651,13 +651,16 @@ function RequestsPanel({
           <div className="col" style={{ gap: 8 }}>
             {outgoing.map(r => (
               <div key={r.requestId} className="surface row" style={{ padding: 14, gap: 12 }}>
-                <Avatar src={r.addresseeAvatarUrl} user={{ initials: r.addresseeInitials, color: r.addresseeColor }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 600 }}>{r.addresseeDisplayName}</div>
-                  <div className="mono" style={{ fontSize: 11, color: 'var(--text-lo)' }}>
-                    {r.mutualFriendCount} mutual friend{r.mutualFriendCount !== 1 ? 's' : ''}
-                  </div>
-                </div>
+                <PlayerIdentity
+                  player={{
+                    username: r.addresseeUsername,
+                    displayName: r.addresseeDisplayName,
+                    initials: r.addresseeInitials,
+                    color: r.addresseeColor,
+                    avatarUrl: r.addresseeAvatarUrl,
+                  }}
+                  subtitle={`${r.mutualFriendCount} mutual friend${r.mutualFriendCount !== 1 ? 's' : ''}`}
+                />
                 <Button
                   size="sm" variant="ghost" icon="x"
                   disabled={isP(`cancel-${r.requestId}`)}
@@ -708,13 +711,10 @@ function SuggestionsList({ suggestions, loading, error, pendingActions, onSend, 
     <div className="col" style={{ gap: 8 }}>
       {suggestions.map(s => (
         <div key={s.userId} className="surface row" style={{ padding: 14, gap: 12 }}>
-          <Avatar src={s.avatarUrl} user={{ initials: s.initials, color: s.color }} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13.5, fontWeight: 600 }}>{s.displayName}</div>
-            <div className="mono" style={{ fontSize: 11, color: 'var(--text-lo)' }}>
-              {s.mutualFriendCount} mutual friend{s.mutualFriendCount === 1 ? '' : 's'}
-            </div>
-          </div>
+          <PlayerIdentity
+            player={s}
+            subtitle={`${s.mutualFriendCount} mutual friend${s.mutualFriendCount === 1 ? '' : 's'}`}
+          />
           <Button
             size="sm" variant="ghost" icon="plus"
             disabled={isP(`send-${s.userId}`)}
@@ -762,11 +762,7 @@ function SuggestedSidecar({ suggestions, loading, pendingActions, onSend, onDism
           <div style={{ fontSize: 12, color: 'var(--text-lo)' }}>No suggestions yet.</div>
         ) : visible.map(s => (
           <div key={s.userId} className="row" style={{ gap: 10 }}>
-            <Avatar src={s.avatarUrl} user={{ initials: s.initials, color: s.color }} size="sm" />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12.5, fontWeight: 600 }}>{s.displayName}</div>
-              <div className="mono" style={{ fontSize: 11, color: 'var(--text-lo)' }}>{s.mutualFriendCount} mutual</div>
-            </div>
+            <PlayerIdentity player={s} size="sm" subtitle={`${s.mutualFriendCount} mutual`} />
             <Button
               size="sm" variant="ghost" icon="plus"
               disabled={isP(`send-${s.userId}`)}

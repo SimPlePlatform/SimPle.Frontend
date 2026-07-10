@@ -3,8 +3,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ApiError } from '@/lib/api-client';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
-import { Avatar } from '@/components/ui/Avatar';
 import { useToast } from '@/components/ui/Toast';
+import { PlayerIdentity } from '@/components/identity/PlayerIdentity';
 import { friendsApi } from './friendsApi';
 import { friendsErrorMessage } from './friendsErrors';
 import type { DiscoveryResultDto } from './types';
@@ -117,11 +117,7 @@ export function AddFriendModal({ open, onClose, onSent }: AddFriendModalProps) {
 
         {lookup && (
           <div className="surface row" style={{ padding: 14, gap: 12 }}>
-            <Avatar src={lookup.avatarUrl} user={{ initials: lookup.initials, color: lookup.color }} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 600 }}>{lookup.displayName}</div>
-              <div className="mono" style={{ fontSize: 11, color: 'var(--text-lo)' }}>@{lookup.username}</div>
-            </div>
+            <PlayerIdentity player={lookup} />
             <Button
               icon="plus"
               disabled={sendLoading}

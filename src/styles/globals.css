@@ -717,4 +717,35 @@ button { font: inherit; cursor: pointer; border: none; background: none; }
   /* .friend-row__actions is intentionally NOT hidden — More button must remain reachable on mobile */
 }
 
+/* Screen-reader-only content — visible to assistive tech, removed from visual flow. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Mobile search panel — full-width overlay row shown under the topbar when the mobile search icon is toggled. */
+.topbar__mobile-search-panel {
+  display: none;
+}
+@media (max-width: 640px) {
+  .topbar__mobile-search-panel {
+    display: block;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    padding: 10px 16px;
+    background: var(--bg-1);
+    border-bottom: 1px solid var(--border-1);
+    z-index: 39;
+  }
+}
+
 [data-theme="light"] :focus-visible { outline-color: var(--border-focus); }

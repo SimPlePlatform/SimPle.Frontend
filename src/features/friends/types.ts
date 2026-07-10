@@ -98,7 +98,11 @@ export interface BlockUserResult {
 }
 
 export type FriendRequestPrivacy = 'Anyone' | 'FriendsOfFriends' | 'Off';
+export type SearchVisibility = 'Everyone' | 'FriendsOfFriends' | 'Nobody';
+export type FriendsListVisibility = 'Everyone' | 'Friends' | 'OnlyMe';
 
 export interface FriendSettingsDto {
   friendRequestPrivacy: FriendRequestPrivacy;
+  searchVisibility: SearchVisibility;
+  friendsListVisibility: FriendsListVisibility;
 }

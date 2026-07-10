@@ -9,6 +9,7 @@ import { GameArt } from '@/components/ui/GameArt';
 import { Icon } from '@/components/ui/Icons';
 import { CreateLobbyModal } from '@/components/lobby/CreateLobbyModal';
 import { InviteFriendModal } from '@/components/friends/InviteFriendModal';
+import { PlayerIdentity } from '@/components/identity/PlayerIdentity';
 import { CURRENT_USER } from '@/mock/users';
 import { GAMES } from '@/mock/games';
 import { RECENT_MATCHES } from '@/mock/matches';
@@ -298,14 +299,7 @@ function FriendsPanel({ friends, loading, error, summary }: FriendsPanelProps) {
           <div style={{ fontSize:13, color:'var(--text-lo)' }}>No friends yet. Add some on the Friends page.</div>
         ) : visible.map(f => (
           <div key={f.userId} className="row" style={{ padding:'10px 8px', borderRadius:10, gap:12 }}>
-            <Avatar src={f.avatarUrl} user={{ initials:f.initials, color:f.color }} />
-            <div style={{ flex:1, minWidth:0 }}>
-              <div className="row" style={{ gap:8 }}>
-                <span style={{ fontSize:13, fontWeight:600 }}>{f.displayName}</span>
-                {/* ELO chip hidden until M10 supplies authoritative ratings */}
-              </div>
-              <div className="mono" style={{ fontSize:11, color:'var(--text-lo)' }}>@{f.username}</div>
-            </div>
+            <PlayerIdentity player={f} />
             <Button size="sm" variant="ghost" icon="message" disabled aria-disabled="true" />
             <Button size="sm" variant="ghost" icon="plus" disabled aria-disabled="true">Invite</Button>
           </div>

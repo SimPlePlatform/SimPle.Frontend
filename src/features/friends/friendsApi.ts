@@ -10,6 +10,8 @@ import type {
   BlockUserResult,
   FriendSettingsDto,
   FriendRequestPrivacy,
+  SearchVisibility,
+  FriendsListVisibility,
   CursorPage,
 } from './types';
 
@@ -84,6 +86,14 @@ export const friendsApi = {
   unblockUser: (blockedUserId: string) =>
     apiFetch<void>(`/api/friends/blocks/${blockedUserId}`, 'DELETE'),
 
-  updateSettings: (privacy: FriendRequestPrivacy) =>
-    apiFetch<FriendSettingsDto>('/api/friends/settings', 'PUT', { friendRequestPrivacy: privacy }),
+  updateSettings: (
+    privacy: FriendRequestPrivacy,
+    searchVisibility?: SearchVisibility,
+    friendsListVisibility?: FriendsListVisibility,
+  ) =>
+    apiFetch<FriendSettingsDto>('/api/friends/settings', 'PUT', {
+      friendRequestPrivacy: privacy,
+      searchVisibility,
+      friendsListVisibility,
+    }),
 };
