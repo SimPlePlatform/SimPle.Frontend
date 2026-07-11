@@ -1,6 +1,6 @@
 import type { AuthUser } from '@/types';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5147';
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5147';
 const CSRF_HEADER = { 'X-Requested-With': 'XMLHttpRequest' };
 
 type Method = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';

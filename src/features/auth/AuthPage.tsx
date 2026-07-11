@@ -471,13 +471,16 @@ function ProfileSetup({ draft, onDone: _onDone }: { draft: RegisterDraft; onDone
 }
 
 function Field({ label, hint, children }: { label:string; hint?: React.ReactNode; children: React.ReactNode }) {
+  // `children` (the real input) is placed before the hint in DOM order so the browser's implicit
+  // label-to-control association resolves to the input, not to an interactive hint (e.g. "Forgot?").
+  // CSS `order` restores the original label-then-input visual layout.
   return (
-    <label style={{ display:'block' }}>
-      <div className="row between" style={{ marginBottom:6 }}>
+    <label style={{ display:'flex', flexDirection:'column' }}>
+      <div style={{ order:1 }}>{children}</div>
+      <div className="row between" style={{ marginBottom:6, order:0 }}>
         <span className="label">{label}</span>
         {hint}
       </div>
-      {children}
     </label>
   );
 }

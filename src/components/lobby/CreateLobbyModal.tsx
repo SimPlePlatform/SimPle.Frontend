@@ -43,7 +43,7 @@ export function CreateLobbyModal({ open, onClose }: Props) {
           <div className="grid grid-4" style={{ gap:10 }}>
             {GAMES.slice(0,8).map(g => (
               <button key={g.id} onClick={() => setGame(g)} className="surface" style={{ padding:8, cursor:'pointer', border: game.id === g.id ? '1px solid rgba(240,57,75,0.4)' : '1px solid var(--border-1)', background: game.id === g.id ? 'var(--red-soft)' : undefined }}>
-                <GameArt game={g} h={70} />
+                <GameArt game={{ artToken: g.art.kind, artColorA: g.art.a, artColorB: g.art.b, artAltText: g.name, name: g.name }} h={70} />
                 <div style={{ fontSize:11.5, fontWeight:600, marginTop:6, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{g.name}</div>
               </button>
             ))}

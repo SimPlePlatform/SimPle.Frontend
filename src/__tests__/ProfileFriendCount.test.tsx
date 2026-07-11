@@ -9,6 +9,10 @@ vi.mock('next/link', () => ({
     <a href={href} className={className}>{children}</a>,
 }));
 
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
 const mockUser = {
   id: 'u-1', username: 'testuser', displayName: 'Test User',
   initials: 'TU', color: '#F0394B', status: 'online',

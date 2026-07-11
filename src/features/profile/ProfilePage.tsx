@@ -1,8 +1,10 @@
 'use client';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
+import { GameArt } from '@/components/ui/GameArt';
 import { Icon } from '@/components/ui/Icons';
 import { StatCard } from '@/components/ui/StatCard';
 import { Tabs } from '@/components/ui/Tabs';
@@ -13,6 +15,8 @@ import { profileApi, type UserProfile, type ProfileViewerContext, type Relations
 import { friendsApi } from '@/features/friends/friendsApi';
 import { friendsErrorMessage } from '@/features/friends/friendsErrors';
 import { useAuth } from '@/features/auth/AuthProvider';
+import { gamesApi } from '@/features/games/gamesApi';
+import type { GameFavoriteDto } from '@/features/games/types';
 import { ApiError } from '@/lib/api-client';
 import { ROUTES } from '@/lib/routes';
 
@@ -39,6 +43,7 @@ function VisibilityBadge({ visibility }: { visibility: string }) {
 
 export function ProfilePage({ username }: { username: string }) {
   const { user: authUser } = useAuth();
+  const router = useRouter();
   const toast = useToast();
   const [tab, setTab] = useState('overview');
   const [editing, setEditing] = useState(false);
@@ -88,6 +93,32 @@ export function ProfilePage({ username }: { username: string }) {
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, [load]);
+
+  const [favItems, setFavItems] = useState<GameFavoriteDto[]>([]);
+  const [favCursor, setFavCursor] = useState<string | null>(null);
+  const [favLoading, setFavLoading] = useState(false);
+  const [favLoadingMore, setFavLoadingMore] = useState(false);
+  const [favError, setFavError] = useState<string | null>(null);
+  const favLoadedRef = useRef(false);
+
+  const loadFavorites = useCallback((cur: string | null, append: boolean) => {
+    if (append) setFavLoadingMore(true); else setFavLoading(true);
+    setFavError(null);
+    gamesApi.getFavorites({ limit: 24, cursor: cur ?? undefined })
+      .then(r => {
+        setFavItems(prev => append ? [...prev, ...r.items] : r.items);
+        setFavCursor(r.nextCursor);
+      })
+      .catch(e => setFavError(e instanceof ApiError ? e.message : 'Failed to load favorite games.'))
+      .finally(() => { setFavLoading(false); setFavLoadingMore(false); });
+  }, []);
+
+  useEffect(() => {
+    if (tab === 'games' && isOwn && !favLoadedRef.current) {
+      favLoadedRef.current = true;
+      loadFavorites(null, false);
+    }
+  }, [tab, isOwn, loadFavorites]);
 
   const handleSave = async () => {
     if (!profile) return;
@@ -410,7 +441,7 @@ export function ProfilePage({ username }: { username: string }) {
               <div style={{ paddingBottom: 6 }}>
                 {!editing ? (
                   <>
-                    <div className="font-display" style={{ fontSize: 24, fontWeight: 600 }}>{profile.displayName}</div>
+                    <h1 className="font-display" style={{ fontSize: 24, fontWeight: 600 }}>{profile.displayName}</h1>
                     <div className="mono" style={{ fontSize: 12, color: 'var(--text-lo)' }}>
                       @{profile.username} · joined {joinedYear}{regionText ? ` · ${regionText}` : ''}
                     </div>
@@ -535,7 +566,36 @@ export function ProfilePage({ username }: { username: string }) {
           <EmptyState icon="trophy" title="Achievements" body="Available once Module 10 (Ranking & Matches) ships." />
         )}
         {tab === 'games' && (
-          <EmptyState icon="library" title="Favorite games" body="Available once Module 4 (Game Library) ships." />
+          !isOwn ? (
+            <EmptyState icon="library" title="Favorite games" body="Only visible to the profile owner." />
+          ) : favLoading ? (
+            <div role="status" style={{ textAlign: 'center', padding: 32, color: 'var(--text-lo)' }}>Loading…</div>
+          ) : favError ? (
+            <div style={{ textAlign: 'center', padding: 24 }}>
+              <p style={{ color: 'var(--danger)', marginBottom: 8 }}>{favError}</p>
+              <Button size="sm" variant="ghost" onClick={() => loadFavorites(null, false)}>Retry</Button>
+            </div>
+          ) : favItems.length === 0 ? (
+            <EmptyState
+              icon="library"
+              title="No favorite games yet"
+              body="Favorite a game from the library to see it here."
+              action={<Button size="sm" onClick={() => router.push(ROUTES.games)}>Browse games</Button>}
+            />
+          ) : (
+            <div className="col" style={{ gap: 12 }}>
+              <div className="grid grid-3">
+                {favItems.map(g => <FavoriteGameCard key={g.slug} favorite={g} />)}
+              </div>
+              {favCursor && (
+                <div style={{ textAlign: 'center' }}>
+                  <Button size="sm" variant="ghost" disabled={favLoadingMore} onClick={() => loadFavorites(favCursor, true)}>
+                    {favLoadingMore ? 'Loading…' : 'Load more'}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )
         )}
       </div>
 
@@ -671,5 +731,23 @@ function MoreMenu({ onBlock }: { onBlock: () => void }) {
         </div>
       )}
     </div>
+  );
+}
+
+function FavoriteGameCard({ favorite }: { favorite: GameFavoriteDto }) {
+  return (
+    <Link href={ROUTES.game(favorite.slug)} style={{ textDecoration: 'none', color: 'inherit' }}>
+      <div className="card" style={{ overflow: 'hidden' }}>
+        <GameArt game={favorite} h={120} />
+        <div style={{ padding: 14 }}>
+          <div style={{ fontWeight: 600, fontSize: 14 }}>{favorite.name}</div>
+          {favorite.lifecycle !== 'Available' && (
+            <div style={{ marginTop: 8 }}>
+              <span className="chip chip--mono">{favorite.lifecycle === 'ComingSoon' ? 'Coming soon' : favorite.lifecycle}</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </Link>
   );
 }
