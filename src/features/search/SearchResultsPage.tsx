@@ -8,11 +8,16 @@ import { Icon } from '@/components/ui/Icons';
 import { Tabs } from '@/components/ui/Tabs';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PlayerIdentity } from '@/components/identity/PlayerIdentity';
+import { Avatar } from '@/components/ui/Avatar';
 import { GameArt } from '@/components/ui/GameArt';
+import { useToast } from '@/components/ui/Toast';
 import { peopleApi } from '@/features/people/peopleApi';
 import type { PeopleSearchResultDto } from '@/features/people/types';
 import { gamesApi } from '@/features/games/gamesApi';
 import type { GameCatalogDto } from '@/features/games/types';
+import { lobbyApi } from '@/features/lobby/lobbyApi';
+import { lobbyErrorMessage } from '@/features/lobby/lobbyErrors';
+import type { LobbySummaryDto } from '@/features/lobby/types';
 import { ROUTES } from '@/lib/routes';
 
 type SearchTab = 'people' | 'games' | 'lobbies';
@@ -37,6 +42,7 @@ function subtitleFor(g: GameCatalogDto): string {
 
 export function SearchResultsPage({ initialQuery, initialType }: { initialQuery: string; initialType: string }) {
   const router = useRouter();
+  const toast = useToast();
   const [tab, setTab] = useState<SearchTab>(initialType === 'games' || initialType === 'lobbies' ? initialType : 'people');
   const [query, setQuery] = useState(initialQuery);
 
@@ -54,8 +60,17 @@ export function SearchResultsPage({ initialQuery, initialType }: { initialQuery:
   const [gameError, setGameError] = useState<string | null>(null);
   const [gameSearched, setGameSearched] = useState(false);
 
+  const [lobbyItems, setLobbyItems] = useState<LobbySummaryDto[]>([]);
+  const [lobbyCursor, setLobbyCursor] = useState<string | null>(null);
+  const [lobbyLoading, setLobbyLoading] = useState(false);
+  const [lobbyLoadingMore, setLobbyLoadingMore] = useState(false);
+  const [lobbyError, setLobbyError] = useState<string | null>(null);
+  const [lobbyLoaded, setLobbyLoaded] = useState(false);
+  const [joiningLobbyId, setJoiningLobbyId] = useState<string | null>(null);
+
   const seq = useRef(0);
   const gameSeq = useRef(0);
+  const lobbySeq = useRef(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const didMount = useRef(false);
 
@@ -113,16 +128,59 @@ export function SearchResultsPage({ initialQuery, initialType }: { initialQuery:
     }
   }, []);
 
+  const loadLobbies = useCallback(async (cur: string | null, append: boolean) => {
+    const mySeq = ++lobbySeq.current;
+    if (append) setLobbyLoadingMore(true); else setLobbyLoading(true);
+    setLobbyError(null);
+    try {
+      const r = await lobbyApi.getPublic({ cursor: cur ?? undefined, limit: 20 });
+      if (mySeq !== lobbySeq.current) return;
+      setLobbyItems(prev => append ? [...prev, ...r.items] : r.items);
+      setLobbyCursor(r.nextCursor);
+      setLobbyLoaded(true);
+    } catch (e) {
+      if (mySeq !== lobbySeq.current) return;
+      setLobbyError(e instanceof ApiError ? e.message : 'Failed to load public lobbies.');
+    } finally {
+      if (mySeq === lobbySeq.current) { setLobbyLoading(false); setLobbyLoadingMore(false); }
+    }
+  }, []);
+
+  const joinLobby = useCallback(async (lobbyId: string) => {
+    if (joiningLobbyId) return;
+    setJoiningLobbyId(lobbyId);
+    try {
+      const result = await lobbyApi.join({ lobbyId });
+      router.push(ROUTES.lobby(result.lobbyId));
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) {
+        setLobbyItems(prev => prev.filter(l => l.lobbyId !== lobbyId));
+        toast.push({ kind: 'default', title: 'This lobby is no longer available.' });
+      } else {
+        toast.push({ kind: 'default', title: 'Could not join lobby', body: lobbyErrorMessage(e) });
+      }
+    } finally {
+      setJoiningLobbyId(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [joiningLobbyId, router]);
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (initialType === 'games') loadGames(initialQuery, null, false);
+    else if (initialType === 'lobbies') loadLobbies(null, false);
     else load(initialQuery, null, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (!didMount.current) { didMount.current = true; return; }
-    if (tab === 'lobbies') return;
+    if (tab === 'lobbies') {
+      router.replace(ROUTES.search({ type: 'lobbies' }));
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (!lobbyLoaded && !lobbyLoading) loadLobbies(null, false);
+      return;
+    }
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       router.replace(ROUTES.search({ type: tab, q: query.trim() }));
@@ -138,20 +196,26 @@ export function SearchResultsPage({ initialQuery, initialType }: { initialQuery:
 
   return (
     <div className="page">
-      <div className="page-title">Search</div>
+      <h1 className="page-title">Search</h1>
       <div className="page-sub">Find players by username or display name, or browse games.</div>
 
-      <div style={{ position: 'relative', maxWidth: 420, marginTop: 16, marginBottom: 4 }}>
-        <Icon name="search" size={14} style={{ position: 'absolute', left: 10, top: 11, color: 'var(--text-lo)' }} />
-        <input
-          className="input"
-          style={{ paddingLeft: 30 }}
-          placeholder={searchPlaceholder}
-          aria-label={searchLabel}
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-        />
-      </div>
+      {tab === 'lobbies' ? (
+        <div className="page-sub" style={{ marginTop: 16, marginBottom: 4 }}>
+          Open public lobbies, newest first. There&apos;s no name search for lobbies yet — join one below.
+        </div>
+      ) : (
+        <div style={{ position: 'relative', maxWidth: 420, marginTop: 16, marginBottom: 4 }}>
+          <Icon name="search" size={14} style={{ position: 'absolute', left: 10, top: 11, color: 'var(--text-lo)' }} />
+          <input
+            className="input"
+            style={{ paddingLeft: 30 }}
+            placeholder={searchPlaceholder}
+            aria-label={searchLabel}
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+          />
+        </div>
+      )}
 
       <div style={{ marginTop: 16 }}>
         <Tabs
@@ -167,7 +231,34 @@ export function SearchResultsPage({ initialQuery, initialType }: { initialQuery:
 
       <div style={{ marginTop: 16 }}>
         {tab === 'lobbies' && (
-          <EmptyState icon="network" title="Public lobby search unavailable" body="Available in Module 6." />
+          lobbyLoading && lobbyItems.length === 0 ? (
+            <div role="status" style={{ textAlign: 'center', padding: 32, color: 'var(--text-lo)' }}>Loading…</div>
+          ) : lobbyError ? (
+            <div style={{ textAlign: 'center', padding: 24 }}>
+              <p style={{ color: 'var(--danger)', marginBottom: 8 }}>{lobbyError}</p>
+              <Button size="sm" variant="ghost" onClick={() => loadLobbies(null, false)}>Retry</Button>
+            </div>
+          ) : lobbyLoaded && lobbyItems.length === 0 ? (
+            <EmptyState icon="network" title="No public lobbies right now" body="Open lobbies set to Public will show up here." />
+          ) : (
+            <div className="col" style={{ gap: 2 }}>
+              {lobbyItems.map(l => (
+                <LobbySearchRow
+                  key={l.lobbyId}
+                  lobby={l}
+                  busy={joiningLobbyId === l.lobbyId}
+                  onJoin={() => joinLobby(l.lobbyId)}
+                />
+              ))}
+              {lobbyCursor && (
+                <div style={{ textAlign: 'center', marginTop: 12 }}>
+                  <Button size="sm" variant="ghost" disabled={lobbyLoadingMore} onClick={() => loadLobbies(lobbyCursor, true)}>
+                    {lobbyLoadingMore ? 'Loading…' : 'Load more'}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )
         )}
         {tab === 'games' && (
           gameLoading && gameItems.length === 0 ? (
@@ -252,6 +343,30 @@ export function SearchResultsPage({ initialQuery, initialType }: { initialQuery:
             </div>
           )
         )}
+      </div>
+    </div>
+  );
+}
+
+function LobbySearchRow({ lobby, busy, onJoin }: { lobby: LobbySummaryDto; busy: boolean; onJoin: () => void }) {
+  const full = lobby.joinedCount >= lobby.maxPlayers;
+  return (
+    <div className="friend-row">
+      <div className="row" style={{ gap: 12, alignItems: 'center' }}>
+        <Avatar user={lobby.host} src={lobby.host.avatarUrl} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="row" style={{ gap: 8 }}>
+            <span style={{ fontWeight: 600, fontSize: 13.5 }}>{lobby.gameSlug}</span>
+            {lobby.rated && <span className="chip chip--mono">Rated</span>}
+            <span className="chip chip--mono">{lobby.resolvedRegion}</span>
+          </div>
+          <div className="mono" style={{ fontSize: 11, color: 'var(--text-lo)' }}>
+            Hosted by {lobby.host.displayName} · {lobby.joinedCount}/{lobby.maxPlayers} · {lobby.timeControlId}
+          </div>
+        </div>
+        <Button size="sm" disabled={busy || full} onClick={onJoin}>
+          {full ? 'Full' : busy ? 'Joining…' : 'Join'}
+        </Button>
       </div>
     </div>
   );

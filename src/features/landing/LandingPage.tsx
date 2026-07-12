@@ -89,7 +89,7 @@ function Hero() {
           </div>
           <div className="row" style={{ gap:18, marginTop:28, color:'var(--text-lo)', fontSize:12 }}>
             <span className="row" style={{ gap:6 }}><Icon name="check" size={14} /> No download. Browser-native.</span>
-            <span className="row" style={{ gap:6 }}><Icon name="check" size={14} /> Cross-region matchmaking.</span>
+            <span className="row" style={{ gap:6 }}><Icon name="check" size={14} /> Same-region matchmaking.</span>
             <span className="row" style={{ gap:6 }}><Icon name="check" size={14} /> More games shipping soon.</span>
           </div>
         </div>
