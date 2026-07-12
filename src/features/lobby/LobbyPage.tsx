@@ -1,78 +1,249 @@
-﻿'use client';
-import React, { useState } from 'react';
+'use client';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
 import { Icon } from '@/components/ui/Icons';
 import { Toggle } from '@/components/ui/Toggle';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { ChatPanel } from '@/components/lobby/ChatPanel';
+import { EmptyState, Skeleton } from '@/components/ui/EmptyState';
+import { InviteFriendModal } from '@/components/friends/InviteFriendModal';
 import { useToast } from '@/components/ui/Toast';
-import { CURRENT_USER } from '@/mock/users';
-import { FRIENDS } from '@/mock/friends';
-import { GAMES } from '@/mock/games';
-import { DEFAULT_LOBBY_CHAT } from '@/mock/lobbies';
+import { useAuth } from '@/features/auth/AuthProvider';
+import { lobbyApi } from '@/features/lobby/lobbyApi';
+import { lobbyErrorMessage } from '@/features/lobby/lobbyErrors';
+import { LobbyActions } from '@/features/lobby/types';
+import type { GameCapabilityProfileDto, LobbyDto, LobbySeatDto, UpdateLobbySettingsRequestDto } from '@/features/lobby/types';
+import { ApiError } from '@/lib/api-client';
 import { ROUTES } from '@/lib/routes';
-import type { LobbySlot, ChatMessage } from '@/types';
+
+const POLL_MS = 3000;
+
+function newIdempotencyKey(): string {
+  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
 
 export function LobbyPage({ lobbyId }: { lobbyId: string }) {
   const router = useRouter();
   const toast = useToast();
-  const game = GAMES[3];
+  const { user } = useAuth();
 
-  const [slots, setSlots] = useState<LobbySlot[]>([
-    { kind: 'host',   user: CURRENT_USER, ready: true },
-    { kind: 'friend', user: FRIENDS[0],   ready: true },
-    { kind: 'empty' },
-    { kind: 'empty' },
-  ]);
-  const [aiFill, setAiFill] = useState(false);
-  const [privacy, setPrivacy] = useState('private');
-  const [timeMode, setTimeMode] = useState('Blitz Â· 3+2');
-  const [chat, setChat] = useState<ChatMessage[]>(DEFAULT_LOBBY_CHAT);
+  const [lobby, setLobby] = useState<LobbyDto | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [revealedCredential, setRevealedCredential] = useState<{ code: string; linkToken: string } | null>(null);
+  const [capProfile, setCapProfile] = useState<GameCapabilityProfileDto | null>(null);
 
-  const slotsWithAi = slots.map(s =>
-    s.kind === 'empty' && aiFill
-      ? { kind: 'ai' as const, user: { initials: 'AI', color: '#A78BFA', display: `AI Â· ${game.aiLevels[1]}` }, ready: true }
-      : s
-  );
-  const allReady = slotsWithAi.every(s => s.kind === 'empty' || s.ready);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const sendChat = (text: string) => {
-    setChat(c => [...c, { from: 'You', text, color: '#F0394B', initials: 'AK', when: 'now', me: true }]);
-  };
+  const load = useCallback(async () => {
+    try {
+      const next = await lobbyApi.get(lobbyId);
+      setLobby(next);
+      setLoadError(null);
+      setNotFound(false);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) { setNotFound(true); return; }
+      setLoadError(lobbyErrorMessage(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [lobbyId]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoading(true);
+    load();
+    pollRef.current = setInterval(load, POLL_MS);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [load]);
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(`lobby-credential:${lobbyId}`);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (raw) setRevealedCredential(JSON.parse(raw));
+    } catch {
+      // sessionStorage unavailable — the code just stays hidden until reveal/rotate.
+    }
+  }, [lobbyId]);
+
+  // Settings-editor bounds. Every game has exactly one capability version today, so the active profile always
+  // equals the lobby's pinned one — this would need a version-specific read if a game ever grows a second version.
+  const isHost = lobby?.hostUserId === user?.id;
+  useEffect(() => {
+    if (!lobby || !isHost) return;
+    let cancelled = false;
+    lobbyApi.getCapabilityProfile(lobby.gameSlug).then(p => { if (!cancelled) setCapProfile(p); }).catch(() => {});
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lobby?.gameSlug, isHost]);
+
+  async function withBusy(fn: () => Promise<void>) {
+    if (busy) return;
+    setBusy(true);
+    setActionError(null);
+    try {
+      await fn();
+    } catch (e) {
+      setActionError(lobbyErrorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const setReady = (isReady: boolean) => withBusy(async () => {
+    if (!lobby) return;
+    setLobby(await lobbyApi.setReadiness(lobbyId, { isReady, expectedRevision: lobby.revision }));
+  });
+
+  const leave = () => withBusy(async () => {
+    await lobbyApi.leave(lobbyId);
+    router.push(ROUTES.dashboard);
+  });
+
+  const start = () => withBusy(async () => {
+    if (!lobby) return;
+    const result = await lobbyApi.start(lobbyId, { expectedRevision: lobby.revision, idempotencyKey: newIdempotencyKey() });
+    router.push(ROUTES.room(result.lobbyId));
+  });
+
+  const kick = (targetUserId: string) => withBusy(async () => {
+    if (!lobby) return;
+    setLobby(await lobbyApi.kick(lobbyId, { targetUserId, expectedRevision: lobby.revision }));
+  });
+
+  const updateSetting = (patch: Partial<Pick<UpdateLobbySettingsRequestDto, 'privacy' | 'timeControlId' | 'rated' | 'spectatorPolicy' | 'tieBreakRuleId'>>) => withBusy(async () => {
+    if (!lobby) return;
+    setLobby(await lobbyApi.updateSettings(lobbyId, {
+      gameSlug: lobby.gameSlug,
+      capabilityVersion: lobby.capabilityVersion,
+      privacy: lobby.privacy,
+      maxPlayers: lobby.maxPlayers,
+      timeControlId: lobby.timeControlId,
+      rated: lobby.rated,
+      spectatorPolicy: lobby.spectatorPolicy,
+      tieBreakRuleId: lobby.tieBreakRuleId,
+      aiFillRequested: lobby.aiFillRequested,
+      expectedRevision: lobby.revision,
+      ...patch,
+    }));
+  });
+
+  const joinAsNonMember = () => withBusy(async () => {
+    try {
+      setLobby(await lobbyApi.join({ lobbyId }));
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) {
+        setNotFound(true);
+        return;
+      }
+      throw e;
+    }
+  });
+
+  const rotateCredential = () => withBusy(async () => {
+    const cred = await lobbyApi.rotateCredential(lobbyId);
+    const revealed = { code: cred.code, linkToken: cred.linkToken };
+    setRevealedCredential(revealed);
+    try { sessionStorage.setItem(`lobby-credential:${lobbyId}`, JSON.stringify(revealed)); } catch { /* best effort */ }
+    toast.push({ kind: 'success', title: 'Code rotated', body: 'The previous code and link no longer work.' });
+  });
 
   const copyCode = () => {
-    navigator.clipboard.writeText(lobbyId).catch(() => {});
-    toast.push({ kind: 'success', title: 'Lobby code copied', body: 'Share it with a friend.' });
+    if (!revealedCredential) return;
+    navigator.clipboard.writeText(revealedCredential.code).catch(() => {});
+    toast.push({ kind: 'success', title: 'Lobby code copied' });
   };
+
+  const copyLink = () => {
+    if (!revealedCredential) return;
+    navigator.clipboard.writeText(`https://simple.gg/j/${revealedCredential.linkToken}`).catch(() => {});
+    toast.push({ kind: 'success', title: 'Invite link copied' });
+  };
+
+  if (loading) {
+    return (
+      <div className="page">
+        <Skeleton h={32} w={160} />
+        <div style={{ marginTop: 18 }}><Skeleton h={400} /></div>
+      </div>
+    );
+  }
+
+  if (notFound) {
+    return (
+      <div className="page">
+        <EmptyState
+          icon="link"
+          title="Lobby not found."
+          body="That lobby code or link is invalid, expired, or closed."
+          action={<Button onClick={() => router.push(ROUTES.dashboard)}>Back to dashboard</Button>}
+        />
+      </div>
+    );
+  }
+
+  if (loadError || !lobby) {
+    return (
+      <div className="page">
+        <EmptyState
+          icon="signal"
+          title="Couldn't load this lobby."
+          body={loadError ?? 'Something went wrong.'}
+          action={<Button icon="refresh" onClick={load}>Retry</Button>}
+        />
+      </div>
+    );
+  }
+
+  const me = lobby.seats.find(s => s.identity.userId === user?.id);
+  const emptySeats = Math.max(0, lobby.maxPlayers - lobby.seats.length);
+  const allReady = lobby.seats.length > 0 && lobby.seats.every(s => s.isReady);
+  const canEditSettings = isHost && lobby.allowedActions.includes(LobbyActions.Settings) && !!capProfile;
+  const lobbyFull = lobby.seats.length >= lobby.maxPlayers;
+  const canJoinAsViewer = !me && lobby.privacy === 'Public' && lobby.state === 'Open';
 
   return (
     <div className="page">
       <div className="between" style={{ flexWrap: 'wrap', gap: 12 }}>
         <div>
           <div className="row" style={{ gap: 8 }}>
-            <span className="chip chip--red chip--mono"><span className="dot dot--playing" />Lobby active</span>
-            <span className="chip chip--mono">{privacy === 'private' ? 'Private' : 'Public'}</span>
-            <span className="chip chip--mono">{timeMode}</span>
+            <span className="chip chip--red chip--mono"><span className="dot dot--playing" />{lobby.state}</span>
+            <span className="chip chip--mono">{lobby.privacy}</span>
+            <span className="chip chip--mono">{lobby.timeControlId}</span>
           </div>
-          <div className="page-title" style={{ marginTop: 10 }}>{game.name} Â· Lobby</div>
-          <div className="page-sub">Hosted by you Â· region Auto Â· est. start in 30s</div>
+          <div className="page-title" style={{ marginTop: 10 }}>{lobby.gameSlug} · Lobby</div>
+          <div className="page-sub">{isHost ? 'Hosted by you' : 'Hosted by another player'} · region {lobby.resolvedRegion}</div>
         </div>
         <div className="row" style={{ gap: 8 }}>
-          <button
-            className="chip chip--mono"
-            onClick={copyCode}
-            style={{ height: 32, padding: '0 12px', cursor: 'pointer', border: '1px solid var(--border-2)', background: 'var(--bg-2)' }}
-          >
-            <Icon name="link" size={12} />
-            <span style={{ color: 'var(--text-hi)', fontWeight: 600, margin: '0 6px' }}>{lobbyId}</span>
-            <Icon name="copy" size={12} style={{ color: 'var(--text-lo)' }} />
-          </button>
-          <Button variant="ghost" icon="share">Share invite</Button>
-          <Button variant="ghost" icon="x" onClick={() => router.push(ROUTES.dashboard)}>Leave</Button>
+          {revealedCredential ? (
+            <button
+              className="chip chip--mono"
+              onClick={copyCode}
+              style={{ height: 32, padding: '0 12px', cursor: 'pointer', border: '1px solid var(--border-2)', background: 'var(--bg-2)' }}
+            >
+              <Icon name="link" size={12} />
+              <span style={{ color: 'var(--text-hi)', fontWeight: 600, margin: '0 6px' }}>{revealedCredential.code}</span>
+              <Icon name="copy" size={12} style={{ color: 'var(--text-lo)' }} />
+            </button>
+          ) : lobby.allowedActions.includes(LobbyActions.RotateCredential) ? (
+            <Button variant="ghost" size="sm" icon="link" onClick={rotateCredential} disabled={busy}>Reveal code</Button>
+          ) : null}
+          {revealedCredential && <Button variant="ghost" icon="share" onClick={copyLink}>Share invite</Button>}
+          {lobby.allowedActions.includes(LobbyActions.Invite) && (
+            <Button variant="ghost" icon="users" onClick={() => setInviteOpen(true)}>Invite</Button>
+          )}
+          {lobby.allowedActions.includes(LobbyActions.Leave) && (
+            <Button variant="ghost" icon="x" onClick={leave} disabled={busy}>Leave</Button>
+          )}
         </div>
       </div>
+
+      {actionError && <div role="alert" style={{ marginTop: 12, fontSize: 12.5, color: 'var(--danger)' }}>{actionError}</div>}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 18, marginTop: 22 }}>
         <div className="col" style={{ gap: 18 }}>
@@ -80,31 +251,44 @@ export function LobbyPage({ lobbyId }: { lobbyId: string }) {
             <div className="row between">
               <div>
                 <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}>
-                  Players Â· {slotsWithAi.filter(s => s.kind !== 'empty').length} / {slots.length}
+                  Players · {lobby.seats.length} / {lobby.maxPlayers}
                 </div>
-                <div className="page-sub">Host can kick or promote.</div>
-              </div>
-              <div className="row" style={{ gap: 6 }}>
-                <Button size="sm" variant="ghost" icon="plus" onClick={() => setSlots(s => [...s, { kind: 'empty' }])}>Add slot</Button>
-                <Button size="sm" variant="ghost" icon="refresh" onClick={() => setSlots(s => s.map(slot => slot.kind === 'empty' ? slot : { ...slot, ready: !slot.ready }))}>Toggle ready</Button>
+                <div className="page-sub">Host can kick.</div>
               </div>
             </div>
 
             <div className="grid grid-2" style={{ marginTop: 16 }}>
-              {slotsWithAi.map((s, i) => <SlotCard key={i} slot={s} seat={i + 1} />)}
+              {lobby.seats.map(s => (
+                <SeatCard
+                  key={s.identity.userId}
+                  seat={s}
+                  canKick={isHost && s.identity.userId !== user?.id && lobby.allowedActions.includes(LobbyActions.Kick)}
+                  onKick={() => kick(s.identity.userId)}
+                  busy={busy}
+                />
+              ))}
+              {Array.from({ length: emptySeats }).map((_, i) => <EmptySeatCard key={i} />)}
             </div>
 
             <div className="row between" style={{ marginTop: 18 }}>
               <div className="row" style={{ gap: 8 }}>
-                <Toggle on={aiFill} onChange={setAiFill} label="Fill empty seats with AI" />
-                <span className="chip chip--mono">AI Â· {game.aiLevels[1]}</span>
+                {lobby.aiFillRequested && <span className="chip chip--mono"><Icon name="ai" size={11} /> AI fill requested</span>}
               </div>
               <div className="row" style={{ gap: 8 }}>
-                {allReady ? (
-                  <Button size="lg" icon="play" onClick={() => router.push(ROUTES.room(lobbyId))}>Start match</Button>
-                ) : (
-                  <Button size="lg" disabled icon="clock">Waiting for readyâ€¦</Button>
+                {lobby.allowedActions.includes(LobbyActions.Ready) && me && (
+                  <Toggle on={me.isReady} onChange={setReady} label={me.isReady ? 'Ready' : 'Not ready'} />
                 )}
+                {canJoinAsViewer ? (
+                  <Button icon="plus" onClick={joinAsNonMember} disabled={busy || lobbyFull}>
+                    {lobbyFull ? 'Lobby full' : 'Join lobby'}
+                  </Button>
+                ) : lobby.allowedActions.includes(LobbyActions.Start) ? (
+                  <Button size="lg" icon="play" onClick={start} disabled={busy}>Start match</Button>
+                ) : me ? (
+                  // No client may invent a room (Risk #6) — Start stays disabled, naming Module 8, until the
+                  // backend's own dependencyReadiness says the runtime it hands off to actually exists.
+                  <Button size="lg" disabled icon="clock">{allReady ? 'Starting arrives with Module 8' : 'Waiting for ready…'}</Button>
+                ) : null}
               </div>
             </div>
           </div>
@@ -112,124 +296,153 @@ export function LobbyPage({ lobbyId }: { lobbyId: string }) {
           <div className="card" style={{ padding: 18 }}>
             <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}>Match settings</div>
             <div className="grid grid-3" style={{ marginTop: 12 }}>
-              <SettingDropdown label="Time control" value={timeMode} options={['Bullet Â· 1+0', 'Blitz Â· 3+2', 'Rapid Â· 10+5', 'Classic Â· 30+30']} onChange={setTimeMode} />
-              <SettingDropdown label="Privacy" value={privacy === 'private' ? 'Private (link)' : 'Public'} options={['Private (link)', 'Public']} onChange={v => setPrivacy(v === 'Private (link)' ? 'private' : 'public')} />
-              <SettingDropdown label="Rated" value="Ranked" options={['Ranked', 'Casual']} />
-              <SettingDropdown label="Region" value="Auto" options={['Auto', 'NA-East', 'Asia-SEA']} />
-              <SettingDropdown label="Tie-break" value="Sudden death" options={['Sudden death', 'Bullet round']} />
-              <SettingDropdown label="Spectators" value="Friends only" options={['Anyone', 'Friends only', 'Disabled']} />
+              {canEditSettings ? (
+                <>
+                  <SettingSelect
+                    label="Time control"
+                    value={lobby.timeControlId}
+                    options={capProfile!.timeControls}
+                    onChange={v => updateSetting({ timeControlId: v })}
+                    disabled={busy}
+                  />
+                  <SettingSelect
+                    label="Privacy"
+                    value={lobby.privacy}
+                    options={['Private', 'Public']}
+                    onChange={v => updateSetting({ privacy: v as 'Private' | 'Public' })}
+                    disabled={busy}
+                  />
+                  {capProfile!.ratedEligible ? (
+                    <div>
+                      <div className="uppercase-label">Rated</div>
+                      <div style={{ marginTop: 8 }}>
+                        <Toggle on={lobby.rated} onChange={v => updateSetting({ rated: v })} label={lobby.rated ? 'Ranked' : 'Casual'} />
+                      </div>
+                    </div>
+                  ) : (
+                    <ReadonlySetting label="Rated" value={lobby.rated ? 'Ranked' : 'Casual'} />
+                  )}
+                  <ReadonlySetting label="Region" value={lobby.resolvedRegion} />
+                  <SettingSelect
+                    label="Tie-break"
+                    value={lobby.tieBreakRuleId}
+                    options={capProfile!.tieBreakRules}
+                    onChange={v => updateSetting({ tieBreakRuleId: v })}
+                    disabled={busy}
+                  />
+                  <SettingSelect
+                    label="Spectators"
+                    value={lobby.spectatorPolicy}
+                    options={capProfile!.spectatorPolicies}
+                    onChange={v => updateSetting({ spectatorPolicy: v })}
+                    disabled={busy}
+                  />
+                </>
+              ) : (
+                <>
+                  <ReadonlySetting label="Time control" value={lobby.timeControlId} />
+                  <ReadonlySetting label="Privacy" value={lobby.privacy} />
+                  <ReadonlySetting label="Rated" value={lobby.rated ? 'Ranked' : 'Casual'} />
+                  <ReadonlySetting label="Region" value={lobby.resolvedRegion} />
+                  <ReadonlySetting label="Tie-break" value={lobby.tieBreakRuleId} />
+                  <ReadonlySetting label="Spectators" value={lobby.spectatorPolicy} />
+                </>
+              )}
             </div>
           </div>
         </div>
 
         <div className="col" style={{ gap: 18 }}>
-          <InviteFriendsPanel />
-          <ChatPanel chat={chat} onSend={sendChat} title="Lobby chat" />
+          {!lobby.dependencyReadiness.chat && (
+            <div className="card" style={{ padding: 18 }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, marginBottom: 6 }}>Chat</div>
+              <div className="page-sub">Available once Module 7 — Real-Time Presence, Lobby Updates &amp; Chat ships.</div>
+            </div>
+          )}
         </div>
       </div>
+
+      <InviteFriendModal open={inviteOpen} onClose={() => setInviteOpen(false)} lobbyId={lobby.lobbyId} preselectedGameId={lobby.gameSlug} />
     </div>
   );
 }
 
-function SlotCard({ slot, seat }: { slot: LobbySlot; seat: number }) {
-  if (slot.kind === 'empty') {
-    return (
-      <div className="surface" style={{ padding: 16, borderStyle: 'dashed', display: 'flex', alignItems: 'center', gap: 12, minHeight: 80 }}>
-        <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--bg-3)', color: 'var(--text-lo)', display: 'grid', placeItems: 'center', border: '1px dashed var(--border-3)' }}>
-          <Icon name="plus" size={16} />
-        </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-md)' }}>Seat {seat} Â· Empty</div>
-          <div className="mono" style={{ fontSize: 11, color: 'var(--text-lo)' }}>Invite a friend or fill with AI</div>
-        </div>
-        <Button size="sm" variant="ghost" icon="plus">Invite</Button>
-      </div>
-    );
-  }
-
-  const isAi = slot.kind === 'ai';
+function SeatCard({ seat, canKick, onKick, busy }: { seat: LobbySeatDto; canKick: boolean; onKick: () => void; busy: boolean }) {
   return (
-    <div className="surface" style={{ padding: 14, display: 'flex', alignItems: 'center', gap: 12, minHeight: 80, borderColor: slot.ready ? 'rgba(52,211,153,0.25)' : 'var(--border-2)' }}>
-      <Avatar user={slot.user!} />
+    <div
+      className="surface"
+      style={{
+        padding: 14, display: 'flex', alignItems: 'center', gap: 12, minHeight: 80,
+        borderColor: seat.isReady ? 'rgba(52,211,153,0.25)' : 'var(--border-2)',
+      }}
+    >
+      <Avatar user={seat.identity} src={seat.identity.avatarUrl} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="row" style={{ gap: 8 }}>
-          <span style={{ fontWeight: 600, fontSize: 13.5 }}>{slot.user?.display}</span>
-          {slot.kind === 'host' && <span className="chip chip--red chip--mono"><Icon name="crown" size={11} /> Host</span>}
-          {isAi && <span className="chip chip--mono"><Icon name="ai" size={11} /> AI</span>}
+          <span style={{ fontWeight: 600, fontSize: 13.5 }}>{seat.identity.displayName}</span>
+          {seat.isHost && <span className="chip chip--red chip--mono"><Icon name="crown" size={11} /> Host</span>}
         </div>
-        <div className="mono" style={{ fontSize: 11, color: 'var(--text-lo)' }}>{isAi ? 'Difficulty: Hard' : `Seat ${seat} Â· Auto`}</div>
+        <div className="mono" style={{ fontSize: 11, color: 'var(--text-lo)' }}>@{seat.identity.username}</div>
       </div>
       <div className="row" style={{ gap: 6 }}>
-        <span className={`chip ${slot.ready ? 'chip--success' : 'chip--warn'}`}>
-          <span className={`dot ${slot.ready ? 'dot--online' : 'dot--away'}`} />
-          {slot.ready ? 'Ready' : 'Not ready'}
+        <span className={`chip ${seat.isReady ? 'chip--success' : 'chip--warn'}`}>
+          <span className={`dot ${seat.isReady ? 'dot--online' : 'dot--away'}`} />
+          {seat.isReady ? 'Ready' : 'Not ready'}
         </span>
-        {slot.kind === 'friend' && <button className="btn btn-ghost btn-icon btn-sm"><Icon name="more" size={14} /></button>}
+        {canKick && (
+          <button className="btn btn-ghost btn-icon btn-sm" onClick={onKick} disabled={busy} aria-label={`Kick ${seat.identity.displayName}`}>
+            <Icon name="x" size={14} />
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
-function SettingDropdown({ label, value, options, onChange }: {
-  label: string; value: string; options: string[]; onChange?: (v: string) => void;
+function EmptySeatCard() {
+  return (
+    <div className="surface" style={{ padding: 16, borderStyle: 'dashed', display: 'flex', alignItems: 'center', gap: 12, minHeight: 80 }}>
+      <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--bg-3)', color: 'var(--text-lo)', display: 'grid', placeItems: 'center', border: '1px dashed var(--border-3)' }}>
+        <Icon name="plus" size={16} />
+      </div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-md)' }}>Empty seat</div>
+        <div className="mono" style={{ fontSize: 11, color: 'var(--text-lo)' }}>Invite a friend to fill it</div>
+      </div>
+    </div>
+  );
+}
+
+function SettingSelect({ label, value, options, onChange, disabled }: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+  disabled?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
   return (
-    <div style={{ position: 'relative' }}>
+    <label style={{ display: 'block' }}>
       <div className="uppercase-label">{label}</div>
-      <button onClick={() => setOpen(v => !v)} className="surface row between" style={{ padding: '10px 12px', width: '100%', marginTop: 6, cursor: 'pointer' }}>
-        <span style={{ fontSize: 13, fontWeight: 500 }}>{value}</span>
-        <Icon name="chevronDown" size={14} style={{ color: 'var(--text-lo)' }} />
-      </button>
-      {open && (
-        <div className="card-elev" style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 6, zIndex: 20, padding: 6, overflow: 'hidden' }}>
-          {options.map(o => (
-            <button
-              key={o}
-              onClick={() => { onChange?.(o); setOpen(false); }}
-              className="row"
-              style={{ width: '100%', padding: '8px 10px', borderRadius: 6, background: o === value ? 'var(--bg-tint)' : 'transparent', fontSize: 13, color: o === value ? 'var(--text-hi)' : 'var(--text-md)' }}
-            >
-              {o === value && <Icon name="check" size={12} style={{ color: 'var(--red-500)', marginRight: 6 }} />}
-              <span>{o}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+      <select
+        className="input"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        disabled={disabled}
+        style={{ marginTop: 6, width: '100%', background: 'var(--bg-3)' }}
+      >
+        {!options.includes(value) && <option value={value}>{value}</option>}
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </label>
   );
 }
 
-function InviteFriendsPanel() {
-  const toast = useToast();
-  const [q, setQ] = useState('');
-  const list = FRIENDS.filter(f => f.status !== 'offline').filter(f => !q || f.display.toLowerCase().includes(q.toLowerCase()));
-
+function ReadonlySetting({ label, value }: { label: string; value: string }) {
   return (
-    <div className="card" style={{ padding: 18 }}>
-      <div className="row between">
-        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 14 }}>Invite friends</div>
-        <span className="chip chip--mono">{list.length} online</span>
-      </div>
-      <div style={{ position: 'relative', marginTop: 10 }}>
-        <Icon name="search" size={14} style={{ position: 'absolute', left: 10, top: 11, color: 'var(--text-lo)' }} />
-        <input className="input" value={q} onChange={e => setQ(e.target.value)} placeholder="Search friends" style={{ paddingLeft: 32 }} />
-      </div>
-      <div className="col" style={{ marginTop: 10, gap: 4, maxHeight: 280, overflow: 'auto' }}>
-        {list.map(f => (
-          <div key={f.id} className="row" style={{ padding: '8px 6px', borderRadius: 8, gap: 10 }}>
-            <Avatar user={f} size="sm" showPresence />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12.5, fontWeight: 600 }}>{f.display}</div>
-              <div className="mono" style={{ fontSize: 11, color: 'var(--text-lo)' }}>{f.activity}</div>
-            </div>
-            <Button
-              size="sm" variant="ghost" icon="send"
-              onClick={() => toast.push({ kind: 'info', title: 'Invite sent', body: `${f.display} got a lobby invite.` })}
-            >Invite</Button>
-          </div>
-        ))}
-        {list.length === 0 && <EmptyState icon="users" title="No matches." body="Try a different name." />}
+    <div>
+      <div className="uppercase-label">{label}</div>
+      <div className="surface row" style={{ padding: '10px 12px', width: '100%', marginTop: 6 }}>
+        <span style={{ fontSize: 13, fontWeight: 500 }}>{value}</span>
       </div>
     </div>
   );
