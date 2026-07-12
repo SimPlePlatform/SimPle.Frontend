@@ -14,6 +14,8 @@ vi.mock('@/features/auth/AuthProvider', () => ({
   useAuth: () => ({ status: mockAuth.status }),
 }));
 
+vi.mock('@/components/ui/Toast', () => ({ useToast: () => ({ push: vi.fn() }) }));
+
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
@@ -179,5 +181,58 @@ describe('GameDetailPage', () => {
     expect(favoriteBtn.tagName).toBe('BUTTON');
     favoriteBtn.focus();
     expect(favoriteBtn).toHaveFocus();
+  });
+
+  // ── M6 entry actions: enabled branch + per-game client gating ──────────────
+
+  it('an enabled action for a multiplayer game opens its real modal (create lobby)', async () => {
+    mockAuth.status = 'authenticated';
+    setupDetailFetch(u => {
+      if (u.includes('/api/games/chess-lite')) {
+        return jsonResponse(200, game({
+          slug: 'chess-lite', name: 'Chess Lite', minPlayers: 2, maxPlayers: 2, capabilities: ['multiplayer', 'ranked'],
+          entryActions: [
+            { action: 'quick-match', status: 'enabled', reasonCode: 'Games.EntryDeferred.QuickMatch', ownerModule: 6 },
+            { action: 'create-lobby', status: 'enabled', reasonCode: 'Games.EntryDeferred.Lobby', ownerModule: 6 },
+            { action: 'invite-friend', status: 'enabled', reasonCode: 'Games.EntryDeferred.Invite', ownerModule: 6 },
+          ],
+        }));
+      }
+      return null;
+    });
+    await renderPage('chess-lite');
+    await waitFor(() => expect(screen.getAllByText('Chess Lite').length).toBeGreaterThan(0));
+
+    // quick-match is enabled backend-side but this game doesn't declare the 'quick-match' capability —
+    // the client re-checks per-game and still gates it.
+    expect(screen.getByText('Not supported for this game.')).toBeInTheDocument();
+    const quickMatchBtn = screen.getByText('Quick match').closest('button');
+    expect(quickMatchBtn).toBeDisabled();
+
+    // create-lobby is genuinely enabled for this 2-player game — clicking opens CreateLobbyModal.
+    const createLobbyBtn = screen.getByText('Create lobby').closest('button');
+    expect(createLobbyBtn).not.toBeDisabled();
+    await act(async () => { fireEvent.click(createLobbyBtn!); });
+    await waitFor(() => expect(screen.getByText('Create a lobby')).toBeInTheDocument());
+  });
+
+  it('create-lobby/invite-friend are client-gated with "This is a solo game." for a single-player game', async () => {
+    setupDetailFetch(u => {
+      if (u.includes('/api/games/falling-blocks')) {
+        return jsonResponse(200, game({
+          minPlayers: 1, maxPlayers: 1,
+          entryActions: [
+            { action: 'create-lobby', status: 'enabled', reasonCode: 'Games.EntryDeferred.Lobby', ownerModule: 6 },
+            { action: 'invite-friend', status: 'enabled', reasonCode: 'Games.EntryDeferred.Invite', ownerModule: 6 },
+          ],
+        }));
+      }
+      return null;
+    });
+    await renderPage();
+    await waitFor(() => expect(screen.getAllByText('Falling Blocks').length).toBeGreaterThan(0));
+    expect(screen.getAllByText('This is a solo game.').length).toBe(2);
+    expect(screen.getByText('Create lobby').closest('button')).toBeDisabled();
+    expect(screen.getByText('Invite friend').closest('button')).toBeDisabled();
   });
 });

@@ -27,7 +27,7 @@ beforeEach(() => {
 async function renderModal(open = true) {
   const { InviteFriendModal } = await import('@/components/friends/InviteFriendModal');
   const onClose = vi.fn();
-  render(<InviteFriendModal open={open} onClose={onClose} />);
+  render(<InviteFriendModal open={open} onClose={onClose} lobbyId="lobby-1" />);
   return { onClose };
 }
 
@@ -102,7 +102,7 @@ describe('InviteFriendModal', () => {
     // First open: Alice + Bob
     mockFetch.mockResolvedValueOnce(pagedFriends([makeFriend('f-1', 'Alice'), makeFriend('f-2', 'Bob')]));
     const onClose = vi.fn();
-    const { rerender } = render(<InviteFriendModal open={true} onClose={onClose} />);
+    const { rerender } = render(<InviteFriendModal open={true} onClose={onClose} lobbyId="lobby-1" />);
     await waitFor(() => screen.getByText('Alice'));
 
     // Pick Alice by clicking her row
@@ -116,9 +116,9 @@ describe('InviteFriendModal', () => {
     });
 
     // Close then reopen — state should reset (picked = 0)
-    rerender(<InviteFriendModal open={false} onClose={onClose} />);
+    rerender(<InviteFriendModal open={false} onClose={onClose} lobbyId="lobby-1" />);
     mockFetch.mockResolvedValueOnce(pagedFriends([makeFriend('f-2', 'Bob')]));
-    rerender(<InviteFriendModal open={true} onClose={onClose} />);
+    rerender(<InviteFriendModal open={true} onClose={onClose} lobbyId="lobby-1" />);
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /Send invite \(0\)/i })).toBeInTheDocument();
     });

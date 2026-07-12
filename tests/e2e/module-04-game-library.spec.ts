@@ -66,10 +66,14 @@ test.describe('Module 4 — game library & discovery', () => {
     await expect(page.getByText('Coming soon')).toBeVisible();
     await expect(page.getByText(/online now|play now|\d+ (playing|online)/i)).toHaveCount(0);
 
-    // 4) Every disabled entry action names its real owner module, not a generic label.
-    // Module 6 backs 3 distinct actions (quick match/create lobby/invite friend), so this text
-    // legitimately repeats — .first() only proves the honest deferred-module text is present.
-    await expect(page.getByText('Available once Module 6 — Lobby & Matchmaking System ships.').first()).toBeVisible();
+    // 4) Every still-disabled entry action names its real owner module, not a generic label.
+    // Module 6 shipped its 3 owned actions (quick match/create lobby/invite friend) — for Chess Lite,
+    // create-lobby/invite-friend are now live (maxPlayers 2) and quick-match is client-gated as
+    // "Not supported for this game." (Chess Lite's modes don't include quick-match), so the
+    // "Available once Module 6…" text no longer appears here. Modules 8/9 haven't shipped yet.
+    await expect(page.getByText('Not supported for this game.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Create lobby' })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Invite friend' })).toBeEnabled();
     await expect(page.getByText('Available once Module 8 — Generic Match Room & Match State ships.').first()).toBeVisible();
     await expect(page.getByText('Available once Module 9 — Solo vs AI Platform Flow ships.').first()).toBeVisible();
 
