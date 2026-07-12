@@ -10,7 +10,7 @@ export const ROUTES = {
   u:              (username: string) => `/u/${encodeURIComponent(username)}`,
   uFriends:       (username: string) => `/u/${encodeURIComponent(username)}/friends`,
   uMutualFriends: (username: string) => `/u/${encodeURIComponent(username)}/mutual-friends`,
-  search:         (params: { type?: 'people' | 'games'; q?: string }) => {
+  search:         (params: { type?: 'people' | 'games' | 'lobbies'; q?: string }) => {
     const qs = new URLSearchParams();
     qs.set('type', params.type ?? 'people');
     if (params.q) qs.set('q', params.q);

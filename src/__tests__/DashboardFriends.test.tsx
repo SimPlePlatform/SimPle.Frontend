@@ -78,7 +78,8 @@ describe('DashboardPage friends panel', () => {
     let resolve!: (v: unknown) => void;
     mockFetch.mockReturnValueOnce(new Promise(r => { resolve = r; }));
     await renderDashboard();
-    expect(screen.getByRole('status')).toBeInTheDocument();
+    // Multiple panels (friends, lobby invites) show their own "status" live region while loading.
+    expect(screen.getAllByRole('status').length).toBeGreaterThan(0);
     resolve(friendsOk([]));
   });
 

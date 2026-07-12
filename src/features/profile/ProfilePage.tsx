@@ -17,6 +17,9 @@ import { friendsErrorMessage } from '@/features/friends/friendsErrors';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { gamesApi } from '@/features/games/gamesApi';
 import type { GameFavoriteDto } from '@/features/games/types';
+import { lobbyApi } from '@/features/lobby/lobbyApi';
+import { LobbyActions, type LobbyDto } from '@/features/lobby/types';
+import { InviteFriendModal } from '@/components/friends/InviteFriendModal';
 import { ApiError } from '@/lib/api-client';
 import { ROUTES } from '@/lib/routes';
 
@@ -289,6 +292,20 @@ export function ProfilePage({ username }: { username: string }) {
     }
   };
 
+  // Resolve the viewer's own open lobby (if any) to gate the "Invite to lobby" action below.
+  const [activeLobby, setActiveLobby] = useState<LobbyDto | null>(null);
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (isOwn || !authUser) { setActiveLobby(null); return; }
+    let cancelled = false;
+    lobbyApi.getMyActive()
+      .then(ctx => { if (!cancelled) setActiveLobby(ctx.lobby); })
+      .catch(() => { if (!cancelled) setActiveLobby(null); });
+    return () => { cancelled = true; };
+  }, [isOwn, authUser]);
+  const canInviteToLobby = !!activeLobby && activeLobby.allowedActions.includes(LobbyActions.Invite);
+
   if (loading) {
     return (
       <div className="page">
@@ -499,6 +516,8 @@ export function ProfilePage({ username }: { username: string }) {
                   onBlock={() => setConfirmAction('block')}
                   onUnblock={handleUnblock}
                   onShare={() => void handleShare()}
+                  canInviteToLobby={canInviteToLobby}
+                  onInvite={() => setInviteModalOpen(true)}
                 />
               ) : (
                 <div className="row" style={{ gap: 8 }}>
@@ -622,6 +641,14 @@ export function ProfilePage({ username }: { username: string }) {
             : `${profile.displayName} will be removed from your friends list.`}
         </p>
       </Modal>
+
+      <InviteFriendModal
+        open={inviteModalOpen}
+        onClose={() => setInviteModalOpen(false)}
+        lobbyId={activeLobby?.lobbyId}
+        preselectedGameId={activeLobby?.gameSlug}
+        initialQuery={profile.displayName}
+      />
     </div>
   );
 }
@@ -637,10 +664,13 @@ interface RelationshipActionsProps {
   onBlock: () => void;
   onUnblock: () => void;
   onShare: () => void;
+  canInviteToLobby: boolean;
+  onInvite: () => void;
 }
 
 function RelationshipActions({
   state, actionPending, onAdd, onAccept, onDecline, onCancel, onRemove, onBlock, onUnblock, onShare,
+  canInviteToLobby, onInvite,
 }: RelationshipActionsProps) {
   switch (state) {
     case 'None':
@@ -672,7 +702,9 @@ function RelationshipActions({
     case 'Friends':
       return (
         <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-          <Button variant="ghost" icon="plus" disabled aria-disabled="true">Invite (Module 6)</Button>
+          {canInviteToLobby && (
+            <Button variant="ghost" icon="plus" onClick={onInvite}>Invite to lobby</Button>
+          )}
           <Button variant="ghost" icon="x" disabled={actionPending} onClick={onRemove}>Remove friend</Button>
           <Button variant="ghost" icon="share" onClick={onShare}>Share</Button>
           <MoreMenu onBlock={onBlock} />

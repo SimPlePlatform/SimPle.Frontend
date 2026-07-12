@@ -11,6 +11,9 @@ import { ApiError } from '@/lib/api-client';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { gamesApi } from '@/features/games/gamesApi';
 import type { GameCatalogDto, GameDetailResult, GameEntryActionDto, GameTombstoneDto } from '@/features/games/types';
+import { QuickMatchModal } from '@/components/lobby/QuickMatchModal';
+import { CreateLobbyModal } from '@/components/lobby/CreateLobbyModal';
+import { InviteFriendModal } from '@/components/friends/InviteFriendModal';
 
 // Real module names (docs/ai-workflow/module-registry.md) for honest "coming later" explanations —
 // never invent a name for a module not in the registry.
@@ -53,6 +56,18 @@ function reasonFor(a: GameEntryActionDto): string {
     : `Available once Module ${a.ownerModule} ships.`;
 }
 
+// The action list is a fixed catalogue, not per-game — even once M6 flips an action's status to 'enabled',
+// a specific game may still not actually support it, so the client re-checks it against that game.
+function gatingReason(a: GameEntryActionDto, game: GameCatalogDto): string | null {
+  const livePlayActions: GameEntryActionDto['action'][] = ['quick-match', 'create-lobby', 'invite-friend'];
+  if (livePlayActions.includes(a.action) && game.lifecycle !== 'Available') {
+    return game.lifecycle === 'ComingSoon' ? 'Coming soon.' : 'Not currently available.';
+  }
+  if (a.action === 'quick-match' && !game.capabilities.includes('quick-match')) return 'Not supported for this game.';
+  if ((a.action === 'create-lobby' || a.action === 'invite-friend') && game.maxPlayers <= 1) return 'This is a solo game.';
+  return null;
+}
+
 export function GameDetailPage({ gameId }: { gameId: string }) {
   const router = useRouter();
   const { status } = useAuth();
@@ -68,6 +83,10 @@ export function GameDetailPage({ gameId }: { gameId: string }) {
   const [favoriteBusy, setFavoriteBusy] = useState(false);
   const [showSignInPrompt, setShowSignInPrompt] = useState(false);
   const [favoriteError, setFavoriteError] = useState<string | null>(null);
+
+  const [quickMatchOpen, setQuickMatchOpen] = useState(false);
+  const [createLobbyOpen, setCreateLobbyOpen] = useState(false);
+  const [inviteFriendOpen, setInviteFriendOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -109,6 +128,13 @@ export function GameDetailPage({ gameId }: { gameId: string }) {
     })();
     return () => { cancelled = true; };
   }, [status, result, gameId]);
+
+  function handleEntryAction(action: GameEntryActionDto['action']) {
+    if (status !== 'authenticated') { setShowSignInPrompt(true); return; }
+    if (action === 'quick-match') setQuickMatchOpen(true);
+    else if (action === 'create-lobby') setCreateLobbyOpen(true);
+    else if (action === 'invite-friend') setInviteFriendOpen(true);
+  }
 
   async function toggleFavorite() {
     if (status !== 'authenticated') { setShowSignInPrompt(true); return; }
@@ -243,11 +269,20 @@ export function GameDetailPage({ gameId }: { gameId: string }) {
             <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}>Start a match</div>
             <div className="page-sub">Actions below unlock as later modules ship.</div>
             <div className="col" style={{ marginTop: 16, gap: 10 }}>
-              {game.entryActions.map(a => <DisabledActionRow key={a.action} action={a} />)}
+              {game.entryActions.map(a => {
+                if (a.status !== 'enabled') return <DisabledActionRow key={a.action} action={a} reason={reasonFor(a)} />;
+                const blocked = gatingReason(a, game);
+                if (blocked) return <DisabledActionRow key={a.action} action={a} reason={blocked} />;
+                return <EnabledActionRow key={a.action} action={a} onClick={() => handleEntryAction(a.action)} />;
+              })}
             </div>
           </div>
         </div>
       </div>
+
+      <QuickMatchModal open={quickMatchOpen} onClose={() => setQuickMatchOpen(false)} gameSlug={game.slug} gameName={game.name} />
+      <CreateLobbyModal open={createLobbyOpen} onClose={() => setCreateLobbyOpen(false)} preselectedGameSlug={game.slug} />
+      <InviteFriendModal open={inviteFriendOpen} onClose={() => setInviteFriendOpen(false)} />
     </div>
   );
 }
@@ -269,15 +304,14 @@ function FavoriteToggle({ isFavorited, busy, onToggle }: { isFavorited: boolean 
   );
 }
 
-function DisabledActionRow({ action }: { action: GameEntryActionDto }) {
+function DisabledActionRow({ action, reason }: { action: GameEntryActionDto; reason: string }) {
   const meta = ACTION_META[action.action];
-  const reason = reasonFor(action);
   return (
     <button
       className="surface row"
       disabled
       aria-disabled="true"
-      title={`${reason} (${action.reasonCode})`}
+      title={reason}
       style={{ padding: 14, gap: 12, width: '100%', textAlign: 'left', border: '1px solid var(--border-1)', opacity: 0.55, cursor: 'not-allowed' }}
     >
       <div style={{ width: 38, height: 38, borderRadius: 10, background: `${meta.color}1f`, color: meta.color, display: 'grid', placeItems: 'center', border: `1px solid ${meta.color}44` }}>
@@ -287,6 +321,25 @@ function DisabledActionRow({ action }: { action: GameEntryActionDto }) {
         <div style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--text-hi)' }}>{meta.title}</div>
         <div className="mono" style={{ fontSize: 11, color: 'var(--text-lo)' }}>{reason}</div>
       </div>
+    </button>
+  );
+}
+
+function EnabledActionRow({ action, onClick }: { action: GameEntryActionDto; onClick: () => void }) {
+  const meta = ACTION_META[action.action];
+  return (
+    <button
+      className="surface row"
+      onClick={onClick}
+      style={{ padding: 14, gap: 12, width: '100%', textAlign: 'left', border: '1px solid var(--border-1)', cursor: 'pointer' }}
+    >
+      <div style={{ width: 38, height: 38, borderRadius: 10, background: `${meta.color}1f`, color: meta.color, display: 'grid', placeItems: 'center', border: `1px solid ${meta.color}44` }}>
+        <Icon name={meta.icon} size={18} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--text-hi)' }}>{meta.title}</div>
+      </div>
+      <Icon name="chevronRight" size={14} style={{ color: 'var(--text-lo)' }} />
     </button>
   );
 }

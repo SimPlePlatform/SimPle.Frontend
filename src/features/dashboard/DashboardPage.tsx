@@ -13,13 +13,15 @@ import { InviteFriendModal } from '@/components/friends/InviteFriendModal';
 import { PlayerIdentity } from '@/components/identity/PlayerIdentity';
 import { CURRENT_USER } from '@/mock/users';
 import { RECENT_MATCHES } from '@/mock/matches';
-import { NOTIFICATIONS } from '@/mock/notifications';
 import { ROUTES } from '@/lib/routes';
 import { friendsApi } from '@/features/friends/friendsApi';
 import { useFriendSummary } from '@/features/friends/FriendSummaryContext';
 import type { FriendDto } from '@/features/friends/types';
 import { gamesApi } from '@/features/games/gamesApi';
 import type { GameCatalogDto } from '@/features/games/types';
+import { lobbyApi } from '@/features/lobby/lobbyApi';
+import { lobbyErrorMessage } from '@/features/lobby/lobbyErrors';
+import type { LobbyDto, LobbyInviteDto } from '@/features/lobby/types';
 
 export function DashboardPage() {
   const u = CURRENT_USER;
@@ -52,7 +54,59 @@ export function DashboardPage() {
     return () => { cancelled = true; };
   }, []);
 
-  const inviteCount = NOTIFICATIONS.filter(n => n.kind === 'invite').length;
+  const [activeLobby, setActiveLobby] = useState<LobbyDto | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    lobbyApi.getMyActive()
+      .then(ctx => { if (!cancelled) setActiveLobby(ctx.lobby); })
+      .catch(() => { if (!cancelled) setActiveLobby(null); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const [invites, setInvites] = useState<LobbyInviteDto[]>([]);
+  const [invitesLoading, setInvitesLoading] = useState(true);
+  const [invitesError, setInvitesError] = useState<string | null>(null);
+  const [inviteActionError, setInviteActionError] = useState<string | null>(null);
+  const [busyInviteId, setBusyInviteId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    lobbyApi.getMyInvites()
+      .then(r => { if (!cancelled) setInvites(r); })
+      .catch(e => { if (!cancelled) setInvitesError(lobbyErrorMessage(e)); })
+      .finally(() => { if (!cancelled) setInvitesLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const acceptInvite = async (inviteId: string) => {
+    if (busyInviteId) return;
+    setBusyInviteId(inviteId);
+    setInviteActionError(null);
+    try {
+      const lobby = await lobbyApi.acceptInvite(inviteId);
+      router.push(ROUTES.lobby(lobby.lobbyId));
+    } catch (e) {
+      setInviteActionError(lobbyErrorMessage(e));
+      setBusyInviteId(null);
+    }
+  };
+
+  const declineInvite = async (inviteId: string) => {
+    if (busyInviteId) return;
+    setBusyInviteId(inviteId);
+    setInviteActionError(null);
+    try {
+      await lobbyApi.declineInvite(inviteId);
+      setInvites(prev => prev.filter(i => i.inviteId !== inviteId));
+    } catch (e) {
+      setInviteActionError(lobbyErrorMessage(e));
+    } finally {
+      setBusyInviteId(null);
+    }
+  };
+
+  const inviteCount = invites.length;
 
   const subtitleFriends = summaryLoading || (!summary && !summaryError)
     ? '…'
@@ -64,7 +118,7 @@ export function DashboardPage() {
     <div className="page">
       <div className="between" style={{ flexWrap:'wrap', gap:12 }}>
         <div>
-          <div className="page-title">Good evening, {u.display.split(' ')[0]}.</div>
+          <h1 className="page-title">Good evening, {u.display.split(' ')[0]}.</h1>
           <div className="page-sub">
             {subtitleFriends !== null
               ? `${subtitleFriends} friends · ${inviteCount} invite waiting`
@@ -80,8 +134,13 @@ export function DashboardPage() {
 
       {/* Hero + side panel */}
       <div style={{ display:'grid', gridTemplateColumns:'1.6fr 1fr', gap:18, marginTop:24 }}>
-        <HeroPanel />
-        <SideQuickPanel summary={summary} summaryLoading={summaryLoading} summaryError={summaryError} />
+        <HeroPanel activeLobby={activeLobby} />
+        <SideQuickPanel
+          summary={summary} summaryLoading={summaryLoading} summaryError={summaryError}
+          invites={invites} invitesLoading={invitesLoading} invitesError={invitesError}
+          inviteActionError={inviteActionError} busyInviteId={busyInviteId}
+          onAccept={acceptInvite} onDecline={declineInvite}
+        />
       </div>
 
       {/* Stats */}
@@ -117,7 +176,7 @@ export function DashboardPage() {
   );
 }
 
-function HeroPanel() {
+function HeroPanel({ activeLobby }: { activeLobby: LobbyDto | null }) {
   const router = useRouter();
   const u = CURRENT_USER;
   const pct = u.xp / u.xpToNext;
@@ -151,7 +210,9 @@ function HeroPanel() {
         </div>
         <div className="row" style={{ gap:8, marginTop:20 }}>
           <Button icon="play" onClick={() => router.push(ROUTES.games)}>Quick match</Button>
-          <Button variant="ghost" icon="controller" onClick={() => router.push(ROUTES.lobby('SP-7F-29'))}>Open active lobby</Button>
+          {activeLobby && (
+            <Button variant="ghost" icon="controller" onClick={() => router.push(ROUTES.lobby(activeLobby.lobbyId))}>Open active lobby</Button>
+          )}
         </div>
       </div>
     </div>
@@ -162,13 +223,28 @@ interface SideQuickPanelProps {
   summary: { incomingRequestCount: number } | null;
   summaryLoading: boolean;
   summaryError: string | null;
+  invites: LobbyInviteDto[];
+  invitesLoading: boolean;
+  invitesError: string | null;
+  inviteActionError: string | null;
+  busyInviteId: string | null;
+  onAccept: (inviteId: string) => void;
+  onDecline: (inviteId: string) => void;
 }
 
-function SideQuickPanel({ summary, summaryLoading, summaryError }: SideQuickPanelProps) {
+function SideQuickPanel({
+  summary, summaryLoading, summaryError,
+  invites, invitesLoading, invitesError, inviteActionError, busyInviteId, onAccept, onDecline,
+}: SideQuickPanelProps) {
   return (
     <div className="col" style={{ gap:18 }}>
       <DailyQuestsCard />
-      <PendingInvitesCard summary={summary} summaryLoading={summaryLoading} summaryError={summaryError} />
+      <PendingInvitesCard
+        summary={summary} summaryLoading={summaryLoading} summaryError={summaryError}
+        invites={invites} invitesLoading={invitesLoading} invitesError={invitesError}
+        inviteActionError={inviteActionError} busyInviteId={busyInviteId}
+        onAccept={onAccept} onDecline={onDecline}
+      />
     </div>
   );
 }
@@ -210,10 +286,19 @@ interface PendingInvitesCardProps {
   summary: { incomingRequestCount: number } | null;
   summaryLoading: boolean;
   summaryError: string | null;
+  invites: LobbyInviteDto[];
+  invitesLoading: boolean;
+  invitesError: string | null;
+  inviteActionError: string | null;
+  busyInviteId: string | null;
+  onAccept: (inviteId: string) => void;
+  onDecline: (inviteId: string) => void;
 }
 
-function PendingInvitesCard({ summary, summaryLoading, summaryError }: PendingInvitesCardProps) {
-  const router = useRouter();
+function PendingInvitesCard({
+  summary, summaryLoading, summaryError,
+  invites, invitesLoading, invitesError, inviteActionError, busyInviteId, onAccept, onDecline,
+}: PendingInvitesCardProps) {
   const pendingCount = (!summaryLoading && !summaryError && summary)
     ? summary.incomingRequestCount
     : null;
@@ -222,21 +307,41 @@ function PendingInvitesCard({ summary, summaryLoading, summaryError }: PendingIn
     <div className="card" style={{ padding:18 }}>
       <div className="row between">
         <div style={{ fontFamily:'var(--font-display)', fontWeight:600, fontSize:14 }}>Lobby invites</div>
-        <span className="chip chip--red chip--mono">1 active</span>
+        {invites.length > 0 && <span className="chip chip--red chip--mono">{invites.length} active</span>}
       </div>
-      <div className="surface" style={{ marginTop:14, padding:12 }}>
-        <div className="row" style={{ gap:10 }}>
-          <Avatar user={{ initials:'PR', color:'#38BDF8' }} size="sm" />
-          <div style={{ flex:1, minWidth:0 }}>
-            <div style={{ fontSize:12.5 }}><b>Priya Raman</b> · Chess Lite · 1v1</div>
-            <div className="mono" style={{ fontSize:11, color:'var(--text-lo)' }}>Lobby SP-7F-29 · expires in 4:12</div>
-          </div>
+
+      {invitesLoading ? (
+        <div role="status" style={{ marginTop:14, fontSize:13, color:'var(--text-lo)' }}>Loading…</div>
+      ) : invitesError ? (
+        <div style={{ marginTop:14, fontSize:13, color:'var(--danger)' }}>{invitesError}</div>
+      ) : invites.length === 0 ? (
+        <div style={{ marginTop:14, fontSize:13, color:'var(--text-lo)' }}>No pending lobby invites.</div>
+      ) : (
+        <div className="col" style={{ gap:10, marginTop:14 }}>
+          {invites.map(inv => (
+            <div key={inv.inviteId} className="surface" style={{ padding:12 }}>
+              <div className="row" style={{ gap:10 }}>
+                <Avatar user={inv.inviter} src={inv.inviter.avatarUrl} size="sm" />
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:12.5 }}><b>{inv.inviter.displayName}</b> · {inv.gameSlug}</div>
+                  <div className="mono" style={{ fontSize:11, color:'var(--text-lo)' }}>
+                    Expires {new Date(inv.expiresAtUtc).toLocaleString()}
+                  </div>
+                </div>
+              </div>
+              <div className="row" style={{ gap:8, marginTop:12 }}>
+                <Button size="sm" style={{ flex:1 }} disabled={busyInviteId === inv.inviteId} onClick={() => onAccept(inv.inviteId)}>Join</Button>
+                <Button size="sm" variant="ghost" style={{ flex:1 }} disabled={busyInviteId === inv.inviteId} onClick={() => onDecline(inv.inviteId)}>Decline</Button>
+              </div>
+            </div>
+          ))}
         </div>
-        <div className="row" style={{ gap:8, marginTop:12 }}>
-          <Button size="sm" style={{ flex:1 }} onClick={() => router.push(ROUTES.lobby('SP-7F-29'))}>Join</Button>
-          <Button size="sm" variant="ghost" style={{ flex:1 }}>Decline</Button>
-        </div>
-      </div>
+      )}
+
+      {inviteActionError && (
+        <div role="alert" style={{ marginTop:12, fontSize:12, color:'var(--danger)' }}>{inviteActionError}</div>
+      )}
+
       {pendingCount !== null && pendingCount > 0 && (
         <div className="row" style={{ marginTop:12, gap:8 }}>
           <Icon name="bell" size={14} style={{ color:'var(--text-lo)' }} />

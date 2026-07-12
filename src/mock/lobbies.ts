@@ -1,14 +1,5 @@
-import type { LobbySlot } from '@/types';
-import { CURRENT_USER } from './users';
-import { FRIENDS } from './friends';
-
-export const DEFAULT_LOBBY_SLOTS: LobbySlot[] = [
-  { kind:'host',   user: CURRENT_USER, ready:true  },
-  { kind:'friend', user: FRIENDS[0],   ready:true  },
-  { kind:'empty' },
-  { kind:'empty' },
-];
-
+// DEFAULT_LOBBY_SLOTS was removed — Module 6 wires real seats from LobbyDto.
+// DEFAULT_LOBBY_CHAT is kept deferred: lobby chat arrives with Module 7.
 export const DEFAULT_LOBBY_CHAT = [
   { from:'Priya', text:"gg let's go",           color:'#38BDF8', initials:'PR', when:'-2m' },
   { from:'You',   text:'one sec, grabbing water', color:'#F0394B', initials:'AK', when:'-1m', me:true },

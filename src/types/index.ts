@@ -2,8 +2,6 @@ export type UserStatus = 'online' | 'away' | 'playing' | 'offline';
 export type MatchResult = 'win' | 'loss' | 'draw';
 export type AchievementRarity = 'common' | 'rare' | 'epic' | 'legendary';
 export type NotificationKind = 'invite' | 'friend' | 'system' | 'achieve';
-export type LobbyPrivacy = 'private' | 'public';
-export type SlotKind = 'host' | 'friend' | 'ai' | 'empty';
 
 export interface AuthUser {
   id: string;
@@ -122,12 +120,6 @@ export interface LeaderboardRow {
   country: string;
   trend: string;
   you?: boolean;
-}
-
-export interface LobbySlot {
-  kind: SlotKind;
-  user?: Partial<User & Friend>;
-  ready?: boolean;
 }
 
 export interface ChatMessage {
