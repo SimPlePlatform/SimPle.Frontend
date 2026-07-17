@@ -32,12 +32,19 @@ vi.mock('@/features/friends/FriendSummaryContext', () => ({
   useFriendSummary: () => mockSummaryState,
 }));
 
+const mockGetMyActive = vi.fn(() => Promise.resolve({ lobby: null, ticketId: null }));
+vi.mock('@/features/lobby/lobbyApi', () => ({
+  lobbyApi: { getMyActive: () => mockGetMyActive() },
+}));
+
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 beforeEach(() => {
   mockSummaryState.summary = null;
   mockSummaryState.loading = false;
   mockSummaryState.error = null;
+  mockGetMyActive.mockReset();
+  mockGetMyActive.mockResolvedValue({ lobby: null, ticketId: null });
 });
 
 async function renderSidebar() {
@@ -85,5 +92,13 @@ describe('Sidebar friend badge', () => {
     const { Sidebar } = await import('@/components/layout/Sidebar');
     rerender(<Sidebar />);
     expect(screen.getByText('3')).toBeInTheDocument();
+  });
+
+  it('links Active Lobby only when the authenticated user has one', async () => {
+    mockGetMyActive.mockResolvedValue({ lobby: { lobbyId: 'lobby-real' }, ticketId: null });
+    await renderSidebar();
+    const link = await screen.findByRole('link', { name: 'Active Lobby' });
+    expect(link).toHaveAttribute('href', '/lobby/lobby-real');
+    expect(link).not.toHaveAttribute('href', expect.stringContaining('SP-7F-29'));
   });
 });

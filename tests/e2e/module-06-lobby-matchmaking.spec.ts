@@ -47,8 +47,7 @@ test.describe('Module 6 — lobby & matchmaking system', () => {
 
     // 2) CreateLobbyModal opens with this game preselected; choose Public and create.
     await expect(page.getByText('Create a lobby')).toBeVisible();
-    // Exact match: the wrapping <label> gives the sibling 'Private (link)' tab an accessible name that
-    // also contains 'Public' (the shared 'Privacy' label text bleeds into both tabs' computed names).
+    // Privacy controls are a fieldset with independently named buttons.
     await page.getByRole('button', { name: 'Public', exact: true }).click();
     await page.getByRole('button', { name: 'Create & enter' }).click();
 

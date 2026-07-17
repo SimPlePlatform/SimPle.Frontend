@@ -38,20 +38,25 @@ export function LobbyPage({ lobbyId }: { lobbyId: string }) {
   const [capProfile, setCapProfile] = useState<GameCapabilityProfileDto | null>(null);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const clearStoredCredential = useCallback(() => {
+    try { sessionStorage.removeItem(`lobby-credential:${lobbyId}`); } catch { /* best effort */ }
+    setRevealedCredential(null);
+  }, [lobbyId]);
 
   const load = useCallback(async () => {
     try {
       const next = await lobbyApi.get(lobbyId);
       setLobby(next);
+      if (next.state === 'Closed') clearStoredCredential();
       setLoadError(null);
       setNotFound(false);
     } catch (e) {
-      if (e instanceof ApiError && e.status === 404) { setNotFound(true); return; }
+      if (e instanceof ApiError && e.status === 404) { clearStoredCredential(); setNotFound(true); return; }
       setLoadError(lobbyErrorMessage(e));
     } finally {
       setLoading(false);
     }
-  }, [lobbyId]);
+  }, [lobbyId, clearStoredCredential]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -102,6 +107,7 @@ export function LobbyPage({ lobbyId }: { lobbyId: string }) {
 
   const leave = () => withBusy(async () => {
     await lobbyApi.leave(lobbyId);
+    clearStoredCredential();
     router.push(ROUTES.dashboard);
   });
 
