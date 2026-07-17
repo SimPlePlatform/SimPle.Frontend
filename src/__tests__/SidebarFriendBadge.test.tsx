@@ -37,6 +37,20 @@ vi.mock('@/features/lobby/lobbyApi', () => ({
   lobbyApi: { getMyActive: () => mockGetMyActive() },
 }));
 
+vi.mock('@/features/realtime/RealtimeConnectionProvider', () => ({
+  useRealtime: () => ({
+    connectionState: 'connected',
+    presence: new Map(),
+    subscribeLobby: vi.fn().mockResolvedValue(undefined),
+    unsubscribeLobby: vi.fn().mockResolvedValue(undefined),
+    sendLobbyMessage: vi.fn(),
+    retry: vi.fn(),
+    addEventListener: vi.fn(() => vi.fn()),
+  }),
+  usePresence: () => undefined,
+  useRealtimeEvent: () => {},
+}));
+
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 beforeEach(() => {

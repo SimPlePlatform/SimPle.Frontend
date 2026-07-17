@@ -31,6 +31,20 @@ vi.mock('@/features/auth/accountApi', () => ({
 const mockToast = { push: vi.fn() };
 vi.mock('@/components/ui/Toast', () => ({ useToast: () => mockToast }));
 
+vi.mock('@/features/realtime/RealtimeConnectionProvider', () => ({
+  useRealtime: () => ({
+    connectionState: 'connected',
+    presence: new Map(),
+    subscribeLobby: vi.fn().mockResolvedValue(undefined),
+    unsubscribeLobby: vi.fn().mockResolvedValue(undefined),
+    sendLobbyMessage: vi.fn(),
+    retry: vi.fn(),
+    addEventListener: vi.fn(() => vi.fn()),
+  }),
+  usePresence: () => undefined,
+  useRealtimeEvent: () => {},
+}));
+
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
