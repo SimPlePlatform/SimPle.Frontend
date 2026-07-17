@@ -1,6 +1,14 @@
 import type { NextConfig } from "next";
 import path from "path";
 
+/**
+ * Server-only escape hatch for running the frontend without the public Caddy
+ * gateway (for example, an isolated container smoke test). In the deployed
+ * stack, Caddy owns the same-origin `/api/*` route and this is intentionally
+ * left unset.
+ */
+const apiProxyTarget = process.env.SIMPLE_API_PROXY_TARGET?.replace(/\/+$/, "");
+
 const securityHeaders = [
   // Prevent browsers from MIME-sniffing away from the declared Content-Type.
   { key: "X-Content-Type-Options", value: "nosniff" },
@@ -15,7 +23,19 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Produces the minimal runtime server used by the production Docker image.
+  output: "standalone",
   outputFileTracingRoot: path.resolve(__dirname),
+  async rewrites() {
+    if (!apiProxyTarget) return [];
+
+    return [
+      {
+        source: "/api/:path*",
+        destination: `${apiProxyTarget}/api/:path*`,
+      },
+    ];
+  },
   async headers() {
     return [
       {

@@ -6,22 +6,26 @@ on:
   pull_request:
     branches: ["main"]
 
+# The normal validation job is deliberately read-only. The separate evidence
+# attestation job gets its write permissions only after validation succeeds.
+permissions:
+  contents: read
+
 jobs:
   frontend:
-    name: Lint, build, test, audit
+    name: Build, test, package, and container smoke
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Set up Node 20
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
           cache-dependency-path: package-lock.json
 
-      - name: Install dependencies
+      - name: Install dependencies reproducibly
         run: npm ci
 
       - name: Type check
@@ -30,17 +34,78 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Build
+      - name: Build production frontend
         run: npm run build
         env:
-          NEXT_PUBLIC_API_URL: http://localhost:5147
-          NEXT_PUBLIC_RECAPTCHA_SITE_KEY: placeholder
-          NEXT_PUBLIC_GOOGLE_CLIENT_ID: placeholder
+          # Deliberately omit NEXT_PUBLIC_API_URL. Production browser traffic
+          # must stay on the Caddy public origin and use relative /api routes.
+          NEXT_PUBLIC_RECAPTCHA_SITE_KEY: placeholder-public-key
+          NEXT_PUBLIC_GOOGLE_CLIENT_ID: placeholder-public-client-id
 
-      - name: Tests
+      - name: Unit and component tests
         run: npm test
 
-      # npm audit may report advisories for transitive dependencies (e.g. PostCSS via Next.js)
-      # that have no safe upgrade path. Run informational-only so it does not block CI.
-      - name: npm audit (informational)
-        run: npm audit --audit-level=critical || true
+      - name: Fail on high or critical npm vulnerabilities
+        run: npm audit --audit-level=high
+
+      - name: Generate reproducible CycloneDX SBOM
+        run: |
+          mkdir -p artifacts/sbom
+          npx --yes @cyclonedx/cyclonedx-npm@6.0.0 \
+            --package-lock-only \
+            --output-reproducible \
+            --output-format JSON \
+            --output-file artifacts/sbom/frontend.cdx.json
+
+      - name: Build production container image
+        run: |
+          docker build \
+            --build-arg NEXT_PUBLIC_RECAPTCHA_SITE_KEY=placeholder-public-key \
+            --build-arg NEXT_PUBLIC_GOOGLE_CLIENT_ID=placeholder-public-client-id \
+            --tag simple-frontend:${{ github.sha }} .
+
+      - name: Smoke the unprivileged container
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --detach --name simple-frontend-smoke -p 3000:3000 simple-frontend:${{ github.sha }}
+          for attempt in {1..30}; do
+            if curl --fail --silent --show-error http://127.0.0.1:3000/ >/dev/null; then
+              docker exec simple-frontend-smoke id | grep -q 'uid=1001(nextjs)'
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs simple-frontend-smoke
+          exit 1
+
+      - name: Remove smoke container
+        if: always()
+        run: docker rm --force simple-frontend-smoke || true
+
+      - name: Upload CI evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: frontend-evidence-${{ github.sha }}
+          path: artifacts/sbom/
+          if-no-files-found: error
+          retention-days: 30
+
+  attest-sbom:
+    name: Attest frontend SBOM evidence
+    needs: frontend
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      attestations: write
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: frontend-evidence-${{ github.sha }}
+          path: evidence
+
+      - uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: evidence/frontend.cdx.json
