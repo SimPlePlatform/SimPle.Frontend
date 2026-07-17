@@ -11,6 +11,8 @@ import { CreateLobbyModal } from '@/components/lobby/CreateLobbyModal';
 import { InviteFriendModal } from '@/components/friends/InviteFriendModal';
 import { PeopleSearchCombobox } from '@/components/search/PeopleSearchCombobox';
 import { useAuth } from '@/features/auth/AuthProvider';
+import { toUserStatus } from '@/features/realtime/presence';
+import { usePresence } from '@/features/realtime/RealtimeConnectionProvider';
 import { useTheme } from '@/lib/theme';
 
 export function Topbar({ onHamburger }: { onHamburger?: () => void }) {
@@ -134,6 +136,7 @@ function NotificationBell({ open, setOpen }: { open: boolean; setOpen: (v: boole
 function UserMenuButton() {
   const router = useRouter();
   const { user, logout } = useAuth();
+  const presence = usePresence(user?.id);
   const { push } = useToast();
   const [open, setOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -172,7 +175,7 @@ function UserMenuButton() {
         aria-expanded={open}
         aria-label="Account menu"
       >
-        <Avatar user={{ initials:user.initials, color:user.color, status:'online' }} size="sm" showPresence />
+        <Avatar user={{ initials:user.initials, color:user.color, status: presence ? toUserStatus(presence.status) : undefined }} size="sm" showPresence />
         <span style={{ fontSize:12.5, fontWeight:500 }}>{user.displayName.split(' ')[0]}</span>
         <Icon name="chevronDown" size={13} style={{ color:'var(--text-lo)' }} />
       </button>

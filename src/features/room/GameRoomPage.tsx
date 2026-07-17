@@ -5,11 +5,9 @@ import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
 import { Icon } from '@/components/ui/Icons';
 import { Modal } from '@/components/ui/Modal';
-import { ChatPanel } from '@/components/lobby/ChatPanel';
 import { CURRENT_USER } from '@/mock/users';
 import { GAMES } from '@/mock/games';
 import { ROUTES } from '@/lib/routes';
-import type { ChatMessage } from '@/types';
 
 const SUDOKU_GIVEN = [
   5,3,0, 0,7,0, 0,0,0,
@@ -34,10 +32,6 @@ export function GameRoomPage({ matchId }: { matchId: string }) {
   const [turn, setTurn] = useState<'you' | 'opp'>('you');
   const [score] = useState({ you: 24, opp: 19 });
   const [selected, setSelected] = useState(40);
-  const [chat, setChat] = useState<ChatMessage[]>([
-    { from: 'AI · Hard', text: 'Good luck!', color: '#A78BFA', initials: 'AI', when: '-7m' },
-    { from: 'You', text: 'thanks', color: '#F0394B', initials: 'AK', when: '-7m', me: true },
-  ]);
 
   useEffect(() => {
     if (paused || resolved) return;
@@ -51,10 +45,6 @@ export function GameRoomPage({ matchId }: { matchId: string }) {
   const opp: PlayerUser = isAi
     ? { display: 'AI · Hard', initials: 'AI', color: '#A78BFA', elo: 0, region: 'local' }
     : { display: 'Priya Raman', initials: 'PR', color: '#38BDF8', elo: 1910, region: 'NL' };
-
-  const handleSendChat = (text: string) => {
-    setChat(c => [...c, { from: 'You', text, color: '#F0394B', initials: 'AK', when: 'now', me: true }]);
-  };
 
   return (
     <div style={{ padding: '22px 36px 36px', maxWidth: 1440, margin: '0 auto' }}>
@@ -111,7 +101,10 @@ export function GameRoomPage({ matchId }: { matchId: string }) {
               <ScorePill label={opp.display.split(' ')[0]} value={score.opp} dim />
             </div>
           </div>
-          <ChatPanel chat={chat} onSend={handleSendChat} title="Match chat" compact />
+          <div className="card" style={{ padding: 18 }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, marginBottom: 6 }}>Match chat</div>
+            <div className="page-sub">Available once match-scoped realtime ships in a later module.</div>
+          </div>
         </div>
       </div>
 

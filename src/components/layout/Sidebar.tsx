@@ -8,6 +8,8 @@ import { ROUTES } from '@/lib/routes';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { useFriendSummary } from '@/features/friends/FriendSummaryContext';
 import { lobbyApi } from '@/features/lobby/lobbyApi';
+import { toUserStatus } from '@/features/realtime/presence';
+import { usePresence } from '@/features/realtime/RealtimeConnectionProvider';
 
 const NAV_SESSION_BASE = [
   { href: ROUTES.profile('me'), label: 'My Profile', icon: 'user' },
@@ -95,11 +97,12 @@ function NavGroup({ label, items, isActive }: {
 
 function UserCard() {
   const { user } = useAuth();
+  const presence = usePresence(user?.id);
   if (!user) return null;
 
   return (
     <div className="surface" style={{ padding:10, display:'flex', gap:10, alignItems:'center' }}>
-      <Avatar user={{ initials:user.initials, color:user.color, status:'online' }} showPresence />
+      <Avatar user={{ initials:user.initials, color:user.color, status: presence ? toUserStatus(presence.status) : undefined }} showPresence />
       <div style={{ minWidth:0, flex:1 }}>
         <div style={{ fontSize:13, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{user.displayName}</div>
         <div className="mono" style={{ fontSize:10.5, color:'var(--text-lo)' }}>@{user.username}</div>

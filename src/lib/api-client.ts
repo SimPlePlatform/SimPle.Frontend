@@ -1,6 +1,24 @@
 import type { AuthUser } from '@/types';
 
-export const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5147';
+const DEFAULT_DEVELOPMENT_API_BASE = 'http://localhost:5147';
+
+/**
+ * Development continues to call the locally hosted backend by default.
+ * Production deliberately uses the browser's origin so the public gateway can
+ * route `/api/*` without cross-origin cookies or a browser-visible backend URL.
+ */
+export function resolveApiBase(configuredApiUrl: string | undefined, isProduction: boolean): string {
+  if (configuredApiUrl === undefined) {
+    return isProduction ? '' : DEFAULT_DEVELOPMENT_API_BASE;
+  }
+
+  return configuredApiUrl.replace(/\/+$/, '');
+}
+
+export const API_BASE = resolveApiBase(
+  process.env.NEXT_PUBLIC_API_URL,
+  process.env.NODE_ENV === 'production',
+);
 const CSRF_HEADER = { 'X-Requested-With': 'XMLHttpRequest' };
 
 type Method = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';

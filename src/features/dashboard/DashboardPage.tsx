@@ -14,6 +14,9 @@ import { PlayerIdentity } from '@/components/identity/PlayerIdentity';
 import { CURRENT_USER } from '@/mock/users';
 import { RECENT_MATCHES } from '@/mock/matches';
 import { ROUTES } from '@/lib/routes';
+import { useAuth } from '@/features/auth/AuthProvider';
+import { toUserStatus } from '@/features/realtime/presence';
+import { usePresence } from '@/features/realtime/RealtimeConnectionProvider';
 import { friendsApi } from '@/features/friends/friendsApi';
 import { useFriendSummary } from '@/features/friends/FriendSummaryContext';
 import type { FriendDto } from '@/features/friends/types';
@@ -24,7 +27,7 @@ import { lobbyErrorMessage } from '@/features/lobby/lobbyErrors';
 import type { LobbyDto, LobbyInviteDto } from '@/features/lobby/types';
 
 export function DashboardPage() {
-  const u = CURRENT_USER;
+  const { user } = useAuth();
   const router = useRouter();
   const [lobbyOpen, setLobbyOpen]   = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -118,7 +121,7 @@ export function DashboardPage() {
     <div className="page">
       <div className="between" style={{ flexWrap:'wrap', gap:12 }}>
         <div>
-          <h1 className="page-title">Good evening, {u.display.split(' ')[0]}.</h1>
+          <h1 className="page-title">Good evening, {user?.displayName.split(' ')[0] ?? 'there'}.</h1>
           <div className="page-sub">
             {subtitleFriends !== null
               ? `${subtitleFriends} friends · ${inviteCount} invite waiting`
@@ -178,31 +181,35 @@ export function DashboardPage() {
 
 function HeroPanel({ activeLobby }: { activeLobby: LobbyDto | null }) {
   const router = useRouter();
-  const u = CURRENT_USER;
-  const pct = u.xp / u.xpToNext;
+  const { user } = useAuth();
+  const presence = usePresence(user?.id);
+  // XP/rank/ELO/region are not yet backed by a real endpoint — kept mocked pending the stats/leveling module.
+  const stats = CURRENT_USER;
+  const pct = stats.xp / stats.xpToNext;
+  if (!user) return null;
   return (
     <div className="card-elev" style={{ padding:20, position:'relative', overflow:'hidden' }}>
       <div style={{ position:'absolute', inset:0, background:'radial-gradient(600px 280px at 100% -20%, rgba(240,57,75,0.18), transparent 60%)' }} />
       <div style={{ position:'relative' }}>
         <div className="row">
-          <span className="chip chip--mono">Region: {u.region}</span>
+          <span className="chip chip--mono">Region: {stats.region}</span>
         </div>
         <div className="row" style={{ marginTop:22, gap:18 }}>
-          <Avatar user={u} size="xl" showPresence />
+          <Avatar user={{ initials: user.initials, color: user.color, status: presence ? toUserStatus(presence.status) : undefined }} size="xl" showPresence />
           <div style={{ flex:1, minWidth:0 }}>
             <div className="row" style={{ gap:10 }}>
-              <div className="font-display" style={{ fontSize:24, fontWeight:600 }}>{u.display}</div>
-              <span className="chip chip--mono">@{u.username}</span>
+              <div className="font-display" style={{ fontSize:24, fontWeight:600 }}>{user.displayName}</div>
+              <span className="chip chip--mono">@{user.username}</span>
             </div>
             <div className="row" style={{ gap:10, marginTop:8 }}>
-              <span className="chip chip--red chip--mono"><Icon name="crown" size={12} /> {u.rank}</span>
-              <span className="chip chip--mono">{u.elo} ELO</span>
-              <span className="chip chip--mono">Lv {u.level}</span>
+              <span className="chip chip--red chip--mono"><Icon name="crown" size={12} /> {stats.rank}</span>
+              <span className="chip chip--mono">{stats.elo} ELO</span>
+              <span className="chip chip--mono">Lv {stats.level}</span>
             </div>
             <div style={{ marginTop:14 }}>
               <div className="row between" style={{ marginBottom:6 }}>
                 <span className="uppercase-label">XP to Diamond II</span>
-                <span className="mono" style={{ fontSize:11, color:'var(--text-lo)' }}>{u.xp.toLocaleString()} / {u.xpToNext.toLocaleString()}</span>
+                <span className="mono" style={{ fontSize:11, color:'var(--text-lo)' }}>{stats.xp.toLocaleString()} / {stats.xpToNext.toLocaleString()}</span>
               </div>
               <div className="bar"><div className="bar__fill" style={{ width:`${pct*100}%` }} /></div>
             </div>

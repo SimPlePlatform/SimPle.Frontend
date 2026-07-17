@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { ToastProvider } from '@/components/ui/Toast';
 import { AuthProvider } from '@/features/auth/AuthProvider';
+import { RealtimeConnectionProvider } from '@/features/realtime/RealtimeConnectionProvider';
 import { ThemeProvider } from '@/lib/theme';
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
@@ -42,7 +43,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Script id="google-gis" src="https://accounts.google.com/gsi/client" strategy="lazyOnload" />
         <ThemeProvider>
           <ToastProvider>
-            <AuthProvider>{children}</AuthProvider>
+            <AuthProvider>
+              <RealtimeConnectionProvider>{children}</RealtimeConnectionProvider>
+            </AuthProvider>
           </ToastProvider>
         </ThemeProvider>
       </body>
