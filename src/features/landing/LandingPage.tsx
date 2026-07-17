@@ -186,7 +186,7 @@ function Trust() {
 
 function FeatureGrid() {
   const features = [
-    { icon:'users',   title:'Friends, not feeds',  body:"A clean roster with live presence, lobby invites and DMs. No infinite scroll, no rage bait." },
+    { icon:'users',   title:'Friends, not feeds',  body:"A clean roster with live presence, lobby invites and lobby chat. No infinite scroll, no rage bait." },
     { icon:'ai',      title:'Train against AI',     body:'Every game ships with 3–4 AI difficulty curves so practice doesn\'t require a partner.' },
     { icon:'network', title:'Real-time lobbies',    body:'Sub-second join, ready states, AI fill, host controls and rejoin-on-disconnect.' },
     { icon:'signal',  title:'Stats that matter',    body:'ELO, win rate, recent form. Per-game leaderboards with global and friends-only views.' },

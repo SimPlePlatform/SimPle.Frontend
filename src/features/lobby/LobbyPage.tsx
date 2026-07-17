@@ -7,12 +7,15 @@ import { Icon } from '@/components/ui/Icons';
 import { Toggle } from '@/components/ui/Toggle';
 import { EmptyState, Skeleton } from '@/components/ui/EmptyState';
 import { InviteFriendModal } from '@/components/friends/InviteFriendModal';
+import { ChatPanel } from '@/components/lobby/ChatPanel';
 import { useToast } from '@/components/ui/Toast';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { lobbyApi } from '@/features/lobby/lobbyApi';
 import { lobbyErrorMessage } from '@/features/lobby/lobbyErrors';
 import { LobbyActions } from '@/features/lobby/types';
 import type { GameCapabilityProfileDto, LobbyDto, LobbySeatDto, UpdateLobbySettingsRequestDto } from '@/features/lobby/types';
+import { toUserStatus } from '@/features/realtime/presence';
+import { useRealtime, useRealtimeEvent, usePresence } from '@/features/realtime/RealtimeConnectionProvider';
 import { ApiError } from '@/lib/api-client';
 import { ROUTES } from '@/lib/routes';
 
@@ -26,6 +29,7 @@ export function LobbyPage({ lobbyId }: { lobbyId: string }) {
   const router = useRouter();
   const toast = useToast();
   const { user } = useAuth();
+  const { connectionState, subscribeLobby, unsubscribeLobby } = useRealtime();
 
   const [lobby, setLobby] = useState<LobbyDto | null>(null);
   const [loading, setLoading] = useState(true);
@@ -38,20 +42,26 @@ export function LobbyPage({ lobbyId }: { lobbyId: string }) {
   const [capProfile, setCapProfile] = useState<GameCapabilityProfileDto | null>(null);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastKnownRevisionRef = useRef(0);
+  const clearStoredCredential = useCallback(() => {
+    try { sessionStorage.removeItem(`lobby-credential:${lobbyId}`); } catch { /* best effort */ }
+    setRevealedCredential(null);
+  }, [lobbyId]);
 
   const load = useCallback(async () => {
     try {
       const next = await lobbyApi.get(lobbyId);
       setLobby(next);
+      if (next.state === 'Closed') clearStoredCredential();
       setLoadError(null);
       setNotFound(false);
     } catch (e) {
-      if (e instanceof ApiError && e.status === 404) { setNotFound(true); return; }
+      if (e instanceof ApiError && e.status === 404) { clearStoredCredential(); setNotFound(true); return; }
       setLoadError(lobbyErrorMessage(e));
     } finally {
       setLoading(false);
     }
-  }, [lobbyId]);
+  }, [lobbyId, clearStoredCredential]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -60,6 +70,25 @@ export function LobbyPage({ lobbyId }: { lobbyId: string }) {
     pollRef.current = setInterval(load, POLL_MS);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [load]);
+
+  useEffect(() => {
+    lastKnownRevisionRef.current = lobby?.revision ?? 0;
+  }, [lobby?.revision]);
+
+  // Join the lobby's realtime group so LobbyChanged hints arrive; re-joins automatically after a reconnect
+  // since group membership is per-connection. Polling above stays as the documented rollback fallback.
+  useEffect(() => {
+    if (connectionState !== 'connected') return;
+    subscribeLobby(lobbyId).catch(() => {});
+    return () => { void unsubscribeLobby(lobbyId); };
+  }, [lobbyId, connectionState, subscribeLobby, unsubscribeLobby]);
+
+  // LobbyChanged is a thin revision hint carrying no lobby state — the only lobby state ever rendered
+  // comes from the client's own GET, so a lost/duplicated/reordered hint costs at most one redundant fetch.
+  useRealtimeEvent('lobbyChanged', ({ envelope, revision }) => {
+    if (envelope.scopeId !== lobbyId) return;
+    if (revision > lastKnownRevisionRef.current) void load();
+  });
 
   useEffect(() => {
     try {
@@ -102,6 +131,7 @@ export function LobbyPage({ lobbyId }: { lobbyId: string }) {
 
   const leave = () => withBusy(async () => {
     await lobbyApi.leave(lobbyId);
+    clearStoredCredential();
     router.push(ROUTES.dashboard);
   });
 
@@ -216,7 +246,7 @@ export function LobbyPage({ lobbyId }: { lobbyId: string }) {
             <span className="chip chip--mono">{lobby.privacy}</span>
             <span className="chip chip--mono">{lobby.timeControlId}</span>
           </div>
-          <div className="page-title" style={{ marginTop: 10 }}>{lobby.gameSlug} · Lobby</div>
+          <h1 className="page-title" style={{ marginTop: 10 }}>{lobby.gameSlug} · Lobby</h1>
           <div className="page-sub">{isHost ? 'Hosted by you' : 'Hosted by another player'} · region {lobby.resolvedRegion}</div>
         </div>
         <div className="row" style={{ gap: 8 }}>
@@ -353,7 +383,9 @@ export function LobbyPage({ lobbyId }: { lobbyId: string }) {
         </div>
 
         <div className="col" style={{ gap: 18 }}>
-          {!lobby.dependencyReadiness.chat && (
+          {lobby.dependencyReadiness.chat ? (
+            <ChatPanel lobbyId={lobby.lobbyId} />
+          ) : (
             <div className="card" style={{ padding: 18 }}>
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, marginBottom: 6 }}>Chat</div>
               <div className="page-sub">Available once Module 7 — Real-Time Presence, Lobby Updates &amp; Chat ships.</div>
@@ -368,6 +400,7 @@ export function LobbyPage({ lobbyId }: { lobbyId: string }) {
 }
 
 function SeatCard({ seat, canKick, onKick, busy }: { seat: LobbySeatDto; canKick: boolean; onKick: () => void; busy: boolean }) {
+  const presence = usePresence(seat.identity.userId);
   return (
     <div
       className="surface"
@@ -376,7 +409,11 @@ function SeatCard({ seat, canKick, onKick, busy }: { seat: LobbySeatDto; canKick
         borderColor: seat.isReady ? 'rgba(52,211,153,0.25)' : 'var(--border-2)',
       }}
     >
-      <Avatar user={seat.identity} src={seat.identity.avatarUrl} />
+      <Avatar
+        user={{ ...seat.identity, status: presence ? toUserStatus(presence.status) : undefined }}
+        src={seat.identity.avatarUrl}
+        showPresence
+      />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="row" style={{ gap: 8 }}>
           <span style={{ fontWeight: 600, fontSize: 13.5 }}>{seat.identity.displayName}</span>

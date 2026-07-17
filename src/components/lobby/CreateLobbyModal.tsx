@@ -176,24 +176,24 @@ export function CreateLobbyModal({ open, onClose, preselectedGameSlug }: Props) 
 
             {profile && (
               <div className="grid grid-2">
-                <label style={{ display: 'block' }}>
-                  <div style={{ marginBottom: 6 }}><span className="label">Privacy</span></div>
-                  <div className="tabs" style={{ width: '100%' }}>
+                <fieldset style={{ display: 'block', border: 0, margin: 0, padding: 0 }}>
+                  <legend className="label" style={{ marginBottom: 6 }}>Privacy</legend>
+                  <div className="tabs" style={{ width: '100%' }} aria-label="Privacy">
                     {(['Private', 'Public'] as const).map(k => (
-                      <button key={k} onClick={() => setPrivacy(k)} className={`tab ${privacy === k ? 'tab--active' : ''}`} style={{ flex: 1 }}>
+                      <button type="button" key={k} onClick={() => setPrivacy(k)} aria-pressed={privacy === k} className={`tab ${privacy === k ? 'tab--active' : ''}`} style={{ flex: 1 }}>
                         {k === 'Private' ? 'Private (link)' : 'Public'}
                       </button>
                     ))}
                   </div>
-                </label>
-                <label style={{ display: 'block' }}>
-                  <div style={{ marginBottom: 6 }}><span className="label">Seats</span></div>
-                  <div className="tabs" style={{ width: '100%' }}>
+                </fieldset>
+                <fieldset style={{ display: 'block', border: 0, margin: 0, padding: 0 }}>
+                  <legend className="label" style={{ marginBottom: 6 }}>Seats</legend>
+                  <div className="tabs" style={{ width: '100%' }} aria-label="Seats">
                     {seatOptions.map(n => (
-                      <button key={n} onClick={() => setSeats(n)} className={`tab ${seats === n ? 'tab--active' : ''}`} style={{ flex: 1 }}>{n}</button>
+                      <button type="button" key={n} onClick={() => setSeats(n)} aria-pressed={seats === n} className={`tab ${seats === n ? 'tab--active' : ''}`} style={{ flex: 1 }}>{n}</button>
                     ))}
                   </div>
-                </label>
+                </fieldset>
                 {profile.timeControls.length > 0 && (
                   <label style={{ display: 'block' }}>
                     <div style={{ marginBottom: 6 }}><span className="label">Time control</span></div>

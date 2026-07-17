@@ -9,6 +9,8 @@ import { useToast } from '@/components/ui/Toast';
 import { accountApi, type Session } from '@/features/auth/accountApi';
 import { ApiError } from '@/lib/api-client';
 import { useAuth } from '@/features/auth/AuthProvider';
+import { toUserStatus } from '@/features/realtime/presence';
+import { usePresence } from '@/features/realtime/RealtimeConnectionProvider';
 import { profileApi, type UserProfile, type UsernameChangeRequest } from '@/features/profile/profileApi';
 import { friendsApi } from '@/features/friends/friendsApi';
 import { friendsErrorMessage } from '@/features/friends/friendsErrors';
@@ -153,6 +155,7 @@ function Field({ label, children, style }: { label: string; children: React.Reac
 function AccountSettings() {
   const toast = useToast();
   const { user, logout } = useAuth();
+  const presence = usePresence(user?.id);
 
   // â”€â”€ Profile card (Module 2) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -345,7 +348,7 @@ function AccountSettings() {
           <>
             <div className="row" style={{ gap: 18 }}>
               <div style={{ position: 'relative', cursor: 'pointer' }} title="Click to upload a new avatar">
-                <Avatar user={{ initials: profile.initials, color: localAvatarColor ?? profile.color, status: 'online' }} src={profile.avatarUrl} size="xl" />
+                <Avatar user={{ initials: profile.initials, color: localAvatarColor ?? profile.color, status: presence ? toUserStatus(presence.status) : undefined }} src={profile.avatarUrl} size="xl" />
                 <label style={{
                   position: 'absolute', inset: 0, borderRadius: '50%',
                   background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center',

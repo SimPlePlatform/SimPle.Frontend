@@ -1,5 +1,5 @@
 'use client';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Icon } from '@/components/ui/Icons';
@@ -7,9 +7,11 @@ import { Avatar } from '@/components/ui/Avatar';
 import { ROUTES } from '@/lib/routes';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { useFriendSummary } from '@/features/friends/FriendSummaryContext';
+import { lobbyApi } from '@/features/lobby/lobbyApi';
+import { toUserStatus } from '@/features/realtime/presence';
+import { usePresence } from '@/features/realtime/RealtimeConnectionProvider';
 
-const NAV_SESSION = [
-  { href: ROUTES.lobby('SP-7F-29'), label: 'Active Lobby', icon: 'controller' },
+const NAV_SESSION_BASE = [
   { href: ROUTES.profile('me'), label: 'My Profile', icon: 'user' },
 ];
 const NAV_META = [
@@ -19,6 +21,18 @@ const NAV_META = [
 export function Sidebar() {
   const pathname = usePathname();
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
+  const { user } = useAuth();
+  const userId = user?.id;
+  const [activeLobbyId, setActiveLobbyId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!userId) return () => { cancelled = true; };
+    lobbyApi.getMyActive()
+      .then((context) => { if (!cancelled) setActiveLobbyId(context.lobby?.lobbyId ?? null); })
+      .catch(() => { if (!cancelled) setActiveLobbyId(null); });
+    return () => { cancelled = true; };
+  }, [userId]);
 
   const { summary, loading, error } = useFriendSummary();
   const friendBadge = (!loading && !error && summary) ? summary.incomingRequestCount : 0;
@@ -28,6 +42,10 @@ export function Sidebar() {
     { href: ROUTES.games, label: 'Game Library', icon: 'library' },
     { href: ROUTES.friends, label: 'Friends', icon: 'users', badgeCount: friendBadge },
     { href: ROUTES.leaderboards, label: 'Leaderboards', icon: 'trophy' },
+  ];
+  const NAV_SESSION = [
+    ...(userId && activeLobbyId ? [{ href: ROUTES.lobby(activeLobbyId), label: 'Active Lobby', icon: 'controller' }] : []),
+    ...NAV_SESSION_BASE,
   ];
 
   return (
@@ -79,11 +97,12 @@ function NavGroup({ label, items, isActive }: {
 
 function UserCard() {
   const { user } = useAuth();
+  const presence = usePresence(user?.id);
   if (!user) return null;
 
   return (
     <div className="surface" style={{ padding:10, display:'flex', gap:10, alignItems:'center' }}>
-      <Avatar user={{ initials:user.initials, color:user.color, status:'online' }} showPresence />
+      <Avatar user={{ initials:user.initials, color:user.color, status: presence ? toUserStatus(presence.status) : undefined }} showPresence />
       <div style={{ minWidth:0, flex:1 }}>
         <div style={{ fontSize:13, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{user.displayName}</div>
         <div className="mono" style={{ fontSize:10.5, color:'var(--text-lo)' }}>@{user.username}</div>

@@ -16,12 +16,29 @@ vi.mock('@/features/auth/AuthProvider', () => ({
 
 vi.mock('@/components/ui/Toast', () => ({ useToast: () => ({ push: vi.fn() }) }));
 
+vi.mock('@/features/realtime/RealtimeConnectionProvider', () => ({
+  useRealtime: () => ({
+    connectionState: 'connected',
+    presence: new Map(),
+    subscribeLobby: vi.fn().mockResolvedValue(undefined),
+    unsubscribeLobby: vi.fn().mockResolvedValue(undefined),
+    sendLobbyMessage: vi.fn(),
+    retry: vi.fn(),
+    addEventListener: vi.fn(() => vi.fn()),
+  }),
+  usePresence: () => undefined,
+  useRealtimeEvent: () => {},
+}));
+
+vi.mock('@/components/lobby/ChatPanel', () => ({ ChatPanel: () => null }));
+
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
 beforeEach(() => {
   mockFetch.mockReset();
   mockPush.mockReset();
+  sessionStorage.clear();
 });
 
 function identity(userId: string, name: string) {
@@ -63,12 +80,30 @@ async function renderPage(lobbyId = 'lobby-1') {
 
 describe('LobbyPage', () => {
   it('renders a not-found state on a 404', async () => {
+    sessionStorage.setItem('lobby-credential:lobby-1', JSON.stringify({ code: 'ABCD', linkToken: 'secret' }));
     setupFetch(u => {
       if (u.includes('/api/lobbies/lobby-1') && !u.includes('capabilities')) return jsonResponse(404, { error: { code: 'Lobbies.NotFound', message: 'Not found' } });
       return null;
     });
     await renderPage();
     await waitFor(() => expect(screen.getByText('Lobby not found.')).toBeInTheDocument());
+    expect(sessionStorage.getItem('lobby-credential:lobby-1')).toBeNull();
+  });
+
+  it('clears the revealed credential when leaving a lobby', async () => {
+    sessionStorage.setItem('lobby-credential:lobby-1', JSON.stringify({ code: 'ABCD', linkToken: 'secret' }));
+    setupFetch((u, opts) => {
+      if (u.endsWith('/api/lobbies/lobby-1') && (opts?.method ?? 'GET') === 'GET') {
+        return jsonResponse(200, lobby({ hostUserId: 'u-1', seats: [seat('u-1', 'Me', { isHost: true })], allowedActions: ['leave'] }));
+      }
+      if (u.endsWith('/api/lobbies/lobby-1/leave') && opts?.method === 'POST') return jsonResponse(200, {});
+      return null;
+    });
+    await renderPage();
+    const leaveButton = await screen.findByRole('button', { name: 'Leave' });
+    await act(async () => { fireEvent.click(leaveButton); });
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/dashboard'));
+    expect(sessionStorage.getItem('lobby-credential:lobby-1')).toBeNull();
   });
 
   it('renders seats and the Ready toggle for a joined member', async () => {
